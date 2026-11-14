@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- the two moons -->
+    <path android:fillColor="#F4EBD0" android:pathData="M64,32 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 Z"/>
+    <path android:fillColor="#BFD3F2" android:pathData="M77,41 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z"/>
+    <!-- distant peak -->
+    <path android:fillColor="#7C9AD0" android:pathData="M50,74 L66,48 L82,74 Z"/>
+    <path android:fillColor="#5D7DB8" android:pathData="M66,48 L82,74 L72,74 L68,60 Z"/>
+    <!-- main snowy peak with a shaded right face -->
+    <path android:fillColor="#EEF4FC" android:pathData="M26,74 L46,38 L66,74 Z"/>
+    <path android:fillColor="#B4C8E8" android:pathData="M46,38 L66,74 L54,74 L48,56 Z"/>
+    <!-- snowy ground -->
+    <path android:fillColor="#EEF4FC" android:pathData="M26,74 L82,74 L82,77 C82,79 80,80 78,80 L30,80 C28,80 26,79 26,77 Z"/>
+</vector>
