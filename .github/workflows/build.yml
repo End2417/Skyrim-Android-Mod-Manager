@@ -1567,7 +1567,17 @@ jobs:
             echo "::error::Missing repository secrets KEYSTORE_BASE64 and/or KEYSTORE_PASSWORD. Add them under Settings > Secrets and variables > Actions."
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > app/skyrimmm.keystore
+          # Keep only the long base64 token, so stray labels, quotes or line breaks added by copy and paste don't matter.
+          B64=$(printf '%s' "$KEYSTORE_BASE64" | tr -d '[:cntrl:]' | grep -oE '[A-Za-z0-9+/=]{300,}' | head -1 || true)
+          echo "KEYSTORE_BASE64 has ${#KEYSTORE_BASE64} characters in total, ${#B64} of them usable base64 (a correct value is about 3500)."
+          if ! printf '%s' "$B64" | base64 -d > app/skyrimmm.keystore 2>/dev/null; then
+            echo "::error::KEYSTORE_BASE64 is not valid base64. It was most likely cut off or changed when pasted. Delete the secret and paste the full value again."
+            exit 1
+          fi
+          if ! keytool -list -keystore app/skyrimmm.keystore -storepass "$KEYSTORE_PASSWORD" > /dev/null 2>&1; then
+            echo "::error::The keystore could not be opened. Check that KEYSTORE_PASSWORD is exactly the password from signing-secrets.txt, and that KEYSTORE_BASE64 is complete."
+            exit 1
+          fi
 
       - uses: gradle/actions/setup-gradle@v4
         with:
