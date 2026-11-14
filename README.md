@@ -1,6 +1,6 @@
 # Skyrim Mod Manager
 
-**Skyrim Legendary Edition mod management for Android, with complete uninstall.**
+**Skyrim Legendary Edition mod management for Android, with complete uninstall and fomod support.**
 
 Skyrim Mod Manager installs mods straight from archives into your Skyrim `Data` folder and tracks every file each mod adds. That lets it uninstall a mod completely later: plugins, textures, meshes, scripts, and anything else it added. It also manages your plugin list and load order through `Plugins.txt` and `loadorder.txt`.
 
