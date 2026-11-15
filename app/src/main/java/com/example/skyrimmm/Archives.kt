@@ -16,17 +16,21 @@ import java.io.DataInputStream
 /** A readable mod archive. forEach visits file entries in order; return false from the callback to stop early. */
 interface Arch : Closeable {
     fun names(): List<String>
+    fun sizes(): Map<String, Long>
     fun forEach(block: (name: String, stream: InputStream) -> Boolean)
 }
 
 /** Keeps one staged copy of a 7z/RAR archive on disk so it is copied (and RAR extracted) only once per install. */
 object Stage {
-    private var key: Uri? = null
+    private var key: String? = null
     fun dir(ctx: Context, uri: Uri): File {
         val d = File(ctx.cacheDir, "staged")
-        if (key != uri || !File(d, "a.bin").exists()) {
+        val doc = DocumentFile.fromSingleUri(ctx, uri)
+        // The signature includes size and date, so a re-downloaded file with the same name is never served from an old staged copy.
+        val sig = "$uri|${doc?.length()}|${doc?.lastModified()}"
+        if (key != sig || !File(d, "a.bin").exists()) {
             clear(ctx); d.mkdirs()
-            val total = DocumentFile.fromSingleUri(ctx, uri)?.length() ?: 0L
+            val total = doc?.length() ?: 0L
             ctx.contentResolver.openInputStream(uri)!!.use { i -> File(d, "a.bin").outputStream().use { o ->
                 val buf = ByteArray(1 shl 16); var done = 0L
                 while (true) {
@@ -36,7 +40,12 @@ object Stage {
                         if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else null)
                 }
             } }
-            key = uri
+            val copied = File(d, "a.bin").length()
+            if (total > 0 && copied != total) {
+                clear(ctx)
+                error("The archive could not be read completely (${fmtSize(copied)} of ${fmtSize(total)}). It may still be downloading, or the file is damaged.")
+            }
+            key = sig
         }
         return d
     }
@@ -49,6 +58,7 @@ fun openArchive(ctx: Context, uri: Uri): Arch {
     fun starts(vararg b: Int) = b.indices.all { head[it] == b[it].toByte() }
     return when {
         starts(0x50, 0x4B) -> ZipArch(ctx, uri)
+        starts(0x54, 0x45, 0x53, 0x34) -> SingleArch(ctx, uri) // "TES4": a bare plugin (.esp/.esm/.esl)
         starts(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C) -> SevenArch(ctx, uri)
         starts(0x52, 0x61, 0x72, 0x21, 0x1A, 0x07) -> RarArch(ctx, uri)
         else -> error("Unsupported archive format (supported: zip, 7z, rar)")
@@ -60,6 +70,7 @@ private class ZipArch(ctx: Context, uri: Uri) : Arch {
     private val zip = ZipFile(File(Stage.dir(ctx, uri), "a.bin"))
     private fun files() = zip.entriesInPhysicalOrder.asSequence().filter { !it.isDirectory }
     override fun names() = files().map { it.name }.toList()
+    override fun sizes() = files().associate { it.name to maxOf(it.size, 0L) }
 
     private fun open(e: ZipArchiveEntry): InputStream = when {
         e.generalPurposeBit.usesEncryption() -> error("Password-protected archives are not supported (${e.name}).")
@@ -74,6 +85,16 @@ private class ZipArch(ctx: Context, uri: Uri) : Arch {
     override fun close() = zip.close()
 }
 
+/** A bare plugin picked on its own: treated as an archive holding one file. */
+private class SingleArch(private val ctx: Context, private val uri: Uri) : Arch {
+    private val doc = DocumentFile.fromSingleUri(ctx, uri)
+    private val name = (doc?.name ?: "plugin.esp").let { n -> if (n.substringAfterLast('.', "").lowercase() in setOf("esp", "esm", "esl")) n else "$n.esp" }
+    override fun names() = listOf(name)
+    override fun sizes() = mapOf(name to (doc?.length() ?: 0L))
+    override fun forEach(block: (String, InputStream) -> Boolean) { ctx.contentResolver.openInputStream(uri)!!.use { block(name, it) } }
+    override fun close() {}
+}
+
 /** Zip's LZMA entries: 2 bytes version, 2 bytes properties size, 5 bytes properties, then the raw LZMA data. */
 private fun lzmaZipStream(raw: InputStream, size: Long): InputStream {
     val h = ByteArray(9)
@@ -85,6 +106,7 @@ private fun lzmaZipStream(raw: InputStream, size: Long): InputStream {
 private class SevenArch(ctx: Context, uri: Uri) : Arch {
     private val sz = SevenZFile(File(Stage.dir(ctx, uri), "a.bin"))
     override fun names() = sz.entries.filter { !it.isDirectory }.map { it.name }
+    override fun sizes() = sz.entries.filter { !it.isDirectory }.associate { it.name to it.size }
     override fun forEach(block: (String, InputStream) -> Boolean) {
         for (e in sz.entries) { if (e.isDirectory) continue; if (!block(e.name, sz.getInputStream(e))) break }
     }
@@ -105,6 +127,7 @@ private class RarArch(ctx: Context, uri: Uri) : Arch {
     }
     private fun rel() = dir.walkTopDown().filter { it.isFile }.map { it.relativeTo(dir).path.replace('\\', '/') }.toList()
     override fun names() = rel()
+    override fun sizes() = rel().associateWith { File(dir, it).length() }
     override fun forEach(block: (String, InputStream) -> Boolean) {
         for (n in rel()) File(dir, n).inputStream().use { if (!block(n, it)) return }
     }

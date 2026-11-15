@@ -14,12 +14,25 @@ This release adds complete uninstall, FOMOD installers, 7z and RAR support, enab
 - **Mod details.** Each mod shows its file count, total size and plugins. Tap the circle to list every file it installed.
 - **Load order.** Activate or deactivate plugins and reorder them through `Plugins.txt` and `loadorder.txt`. When the game folder contains the port folder (`port/save/AppData/Local/Skyrim`), both files are found automatically. Otherwise you can select `plugins.txt` manually. Masters always stay above other plugins.
 - **Load order backups.** Every time you save the load order, the current files are copied into `SkyrimMM Backups/Load order` in your game folder first. The newest 10 of each are kept. If a backup cannot be made, nothing is overwritten.
+- **Plugins follow mods.** After installing a mod, the app offers to activate its plugins. Disabling a mod deactivates them, enabling it restores the ones that were active, and uninstalling it removes them from `Plugins.txt` and `loadorder.txt`. A backup is saved before every change.
+- **Conflict viewer.** Mods that overwrite the same files are marked, and tapping the warning shows which files, which mod wins, and which loses. The mod installed last wins. Disabling or uninstalling an overlapping mod warns you first, and the app no longer deletes a file that a newer mod now owns.
+- **Update a mod.** The refresh button on a mod installs a new archive over it and removes only the files the new version no longer has. The mod keeps its on or off state and its place in your load order. If the new install fails, the old version stays.
+- **Dependency check.** The Load order tab reads each plugin’s header and flags missing, inactive, or misordered masters. Fix order rearranges plugins so every plugin loads after its masters; you review the result before saving. It is not a full LOOT sort.
+- **Single plugins and batches.** Install a bare `.esp`, `.esm` or `.esl` on its own, pick several files at once, or open files from your file manager or the share menu. Files queue up and install one after another.
+- **Mod details.** Rename a mod, add a version, notes and a source link, search the list, and sort by name, newest or largest.
+- **Restore load order backups.** The Backups button on the Load order tab lists every saved version and restores the one you choose, after backing up the current files.
+- **Profiles and setups.** Save the enabled mods and load order as a profile and switch between them. Share a setup as text; the other person imports it from the clipboard and sees which mods they still need.
+- **Verify mods.** Checks that every file of every mod is present and still has its original size.
+- **Free-space check.** The app checks there is room before it copies or extracts an archive.
+- **Skyrim.ini helper.** Turns loose file loading on or off, with a backup of the ini first.
+- **Troubleshooting.** Switches mods off in steps to find the one causing a problem, and puts everything back when you stop.
 - **SKSE warning.** Before installing a mod that appears to need SKSE, the app explains why it was flagged. Detection checks file names, compiled scripts, FOMOD configs and readmes.
 - **Progress window.** Installing, uninstalling, and switching a mod on or off show what is happening and how far along it is.
 - **Fast mode.** With Android’s All files access enabled, the app works on files directly instead of through the folder picker, which is much faster.
 
 ## Changes
 
+- **Load order files are edited more often.** Besides Save, the app now updates `Plugins.txt` and `loadorder.txt` when you accept the activation prompt, or enable, disable or uninstall a mod. It saves a timestamped backup first every time.
 - **Choose the game folder.** Select the folder that contains `Data`. The app finds `Data` and the port folder inside it. Selecting `Data` directly still works.
 
 ## Fixes
@@ -36,7 +49,13 @@ This release adds complete uninstall, FOMOD installers, 7z and RAR support, enab
 - If two mods overwrite the same file, uninstall or disable them in reverse order of installation.
 - FOMOD conditions that check for files outside `Data`, such as `skse_loader.exe`, see those files as missing.
 - Load order is edited manually. There is no automatic sorting.
-- Disabling a mod does not remove its plugin from `Plugins.txt`. Untick it on the Load order tab.
+- The dependency check reads plugin headers only. It does not sort the whole load order the way LOOT does.
+- Conflicts are decided by install order. Mods installed before conflict tracking existed get an estimated install time, which can be wrong.
+- An updated mod counts as the newest mod for conflict purposes.
+- Mod priority is install order. There is no drag-to-reorder priority list.
+- There are no downloads from inside the app.
+- The troubleshooting helper can be fooled by two mods that only misbehave together.
+- Profiles match mods by name.
 - Android does not allow access to another application’s protected `Android/data` directory.
 
 ## Upgrade notes

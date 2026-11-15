@@ -21,6 +21,8 @@ import java.util.zip.ZipInputStream
 
 data class OrderFiles(val plugins: Uri?, val loadOrder: Uri?, val dir: DocumentFile?)
 
+enum class Sync { ACTIVATE, RESTORE, DEACTIVATE, REMOVE }
+
 data class PluginEntry(val name: String, val active: Boolean)
 
 data class Mod(
@@ -29,10 +31,18 @@ data class Mod(
     val dirs: List<String>,             // directories the mod created
     val backups: Map<String, String>,   // files it overwrote -> backup file name
     val enabled: Boolean = true,
-    val size: Long = -1                 // bytes the mod wrote, -1 = not measured yet
+    val size: Long = -1,                // bytes the mod wrote, -1 = not measured yet
+    val time: Long = 0,                 // when it was installed (decides who wins a file conflict)
+    val wasActive: List<String> = emptyList(), // plugins that were active when the mod was disabled
+    val version: String = "", val note: String = "", val link: String = "",
+    val fsizes: Map<String, Long> = emptyMap() // size of every file as installed, for verification
 ) {
     val plugins get() = files.filter { it.substringAfterLast('.').lowercase() in setOf("esp", "esm", "esl") }
 }
+
+class ProfMod(val name: String, val version: String, val link: String)
+class Profile(val id: String, val name: String, val enabled: List<String>, val order: List<PluginEntry>, val mods: List<ProfMod>)
+class Trouble(val phase: String, val original: List<String>, val cands: List<String>, val good: List<String>, val testing: List<String>)
 
 class ModManager(private val ctx: Context) {
     private val store = File(ctx.filesDir, "mods").apply { mkdirs() }
@@ -42,7 +52,8 @@ class ModManager(private val ctx: Context) {
         "seq", "music", "video", "grass", "lodsettings", "shadersfx", "facegen", "source")
 
     fun list(): List<Mod> = store.listFiles { f -> f.extension == "json" }.orEmpty()
-        .map { load(it) }.sortedBy { it.name.lowercase() }
+        .map { f -> load(f).let { m -> if (m.time == 0L) m.copy(time = f.lastModified()).also { save(it) } else m } } // older mods: estimate from the record
+        .sortedBy { it.name.lowercase() }
 
     private fun segs(p: String) = p.replace('\\', '/').split('/').filter { it.isNotEmpty() }
 
@@ -65,7 +76,7 @@ class ModManager(private val ctx: Context) {
         else dir.createFile("application/octet-stream", name)
 
     private fun norm(p: String) = segs(p).joinToString("/").lowercase()
-    private fun zipName(u: Uri) = (DocumentFile.fromSingleUri(ctx, u)?.name ?: "mod").let { n -> if (n.substringAfterLast('.', "").lowercase() in setOf("zip", "7z", "rar")) n.substringBeforeLast('.') else n }
+    private fun zipName(u: Uri) = (DocumentFile.fromSingleUri(ctx, u)?.name ?: "mod").let { n -> if (n.substringAfterLast('.', "").lowercase() in setOf("zip", "7z", "rar", "esp", "esm", "esl")) n.substringBeforeLast('.') else n }
 
     private fun entryNames(zipUri: Uri): List<String> = openArchive(ctx, zipUri).use { it.names() }
 
@@ -138,7 +149,7 @@ class ModManager(private val ctx: Context) {
     }
 
     fun install(dataUri: Uri, zipUri: Uri): Mod {
-        val names = entryNames(zipUri)
+        val names = try { entryNames(zipUri) } catch (t: Throwable) { throw friendly(t) }
         if (names.isEmpty()) error("Empty zip")
         val hasData = names.any { n -> segs(n).let { s -> s.indexOfFirst { it.equals("data", true) }.let { it in 0..1 && it < s.size - 1 } } }
         val firsts = names.map { segs(it).firstOrNull()?.lowercase() }.toSet()
@@ -177,18 +188,31 @@ class ModManager(private val ctx: Context) {
         return extract(dataUri, zipUri, zipName(zipUri)) { n -> plan[n].orEmpty() }
     }
 
+    /** Turns the low-level errors a truncated or corrupt archive produces into something a person can act on. */
+    private fun friendly(t: Throwable): Throwable {
+        val m = t.message.orEmpty().lowercase()
+        val damaged = t is java.io.EOFException || listOf("zlib", "unexpected end", "crc", "invalid stored", "invalid distance", "invalid code",
+            "header check", "truncated", "end-of-central-directory", "central directory", "not a zip").any { it in m }
+        return if (damaged) IllegalStateException("The archive looks damaged or incomplete (${t.message}). Download it again, or check that it opens in another app.", t) else t
+    }
+
     private fun extract(dataUri: Uri, zipUri: Uri, name: String, plan: (String) -> List<List<String>>): Mod {
         val idx = Idx(dataRoot(dataUri))
         val id = UUID.randomUUID().toString().take(8)
         val bdir = File(backupRoot, id).apply { mkdirs() }
         val files = mutableListOf<String>(); val dirs = mutableListOf<String>()
         val backups = mutableMapOf<String, String>()
+        val sizes = mutableMapOf<String, Long>()
         var bytes = 0L
         try {
             Progress.report("Installing $name", "Preparing…", null, force = true)
             openArchive(ctx, zipUri).use { arch ->
                 var n = 0; var done = 0
                 val total = arch.names().count { plan(it).isNotEmpty() }.coerceAtLeast(1)
+                val need = arch.sizes().entries.sumOf { (n, sz) -> plan(n).size * sz }
+                freeSpace(dataUri)?.let { free ->
+                    if (free < need + (20L shl 20)) error("Not enough free space in the game folder's storage: ${fmtSize(need)} needed, ${fmtSize(free)} free.")
+                }
                 arch.forEach { entryName, z ->
                     var first: DocumentFile? = null
                     for (rel in plan(entryName)) {
@@ -205,8 +229,10 @@ class ModManager(private val ctx: Context) {
                         val out = newFile(dir, fname) ?: error("Cannot create $fname")
                         kids[fname.lowercase()] = out
                         files += relStr
-                        if (first == null) { bytes += cr.openOutputStream(out.uri)!!.use { z.copyTo(it, BUF) }; first = out }
-                        else bytes += cr.openInputStream(first.uri)!!.use { i -> cr.openOutputStream(out.uri)!!.use { i.copyTo(it, BUF) } }
+                        val prev = first
+                        val wrote = if (prev == null) { val c = cr.openOutputStream(out.uri)!!.use { z.copyTo(it, BUF) }; first = out; c }
+                        else cr.openInputStream(prev.uri)!!.use { i -> cr.openOutputStream(out.uri)!!.use { i.copyTo(it, BUF) } }
+                        bytes += wrote; sizes[relStr] = wrote
                     }
                     if (first != null) { done++; Progress.report("Installing $name", files.lastOrNull().orEmpty(), done.toFloat() / total) }
                     true
@@ -214,23 +240,45 @@ class ModManager(private val ctx: Context) {
             }
             if (files.isEmpty()) error("No installable files found in archive")
         } catch (t: Throwable) {
-            uninstall(dataUri, Mod(id, name, files, dirs, backups)); throw t
+            removeFiles(dataUri, Mod(id, name, files, dirs, backups, time = System.currentTimeMillis())); throw friendly(t)
         } finally { Stage.clear(ctx) }
-        return Mod(id, name, files, dirs, backups, true, bytes).also { save(it) }
+        return Mod(id, name, files, dirs, backups, true, bytes, System.currentTimeMillis(), fsizes = sizes).also { save(it) }
     }
 
-    /** Removes every file the mod wrote, restores anything it overwrote, and prunes folders it created. */
+    /** Removes a mod: its files (except any a newer mod now owns), restores originals it overwrote, and takes its plugins out of the load order. */
     fun uninstall(dataUri: Uri, mod: Mod) {
+        removeFiles(dataUri, mod)
+        syncPlugins(dataUri, mod, Sync.REMOVE)
+    }
+
+    private fun removeFiles(dataUri: Uri, mod: Mod) {
         var done = 0
         Progress.report("Uninstalling ${mod.name}", "Preparing…", null, force = true)
         val idx = Idx(dataRoot(dataUri))
         val bdir = File(backupRoot, mod.id)
+        // Newer enabled mods that wrote the same files own the live copy, so this mod must not touch it.
+        val newer = HashMap<String, Mod>()
+        for (o in list().filter { it.id != mod.id && it.enabled && it.time > mod.time }.sortedByDescending { it.time })
+            for (f in o.files) newer[normPath(f)] = o // iterating newest first, so the oldest newer writer ends up as the owner
+        val changed = HashMap<String, Mod>()
         for ((parent, group) in mod.files.groupBy { segs(it).dropLast(1) }) {
-            val dir = idx.dir(parent, if (group.any { it in mod.backups }) mutableListOf() else null) ?: continue
+            val dir = idx.dir(parent, if (mod.enabled && group.any { it in mod.backups }) mutableListOf<String>() else null) ?: continue
             val kids = idx.children(parent) ?: continue
             for (f in group) {
                 val fname = segs(f).last(); val key = fname.lowercase()
                 Progress.report("Uninstalling ${mod.name}", f, (++done).toFloat() / mod.files.size)
+                if (!mod.enabled) { kids.remove("$key.disabled")?.delete(); continue }
+                val owner = newer[normPath(f)]
+                if (owner != null) { // hand this mod's backup to the owner instead of touching the live file
+                    val ob = changed[owner.id] ?: owner
+                    val theirs = ob.backups[f]?.let { File(File(backupRoot, ob.id), it) }
+                    val mine = mod.backups[f]?.let { File(bdir, it) }
+                    if (theirs != null) {
+                        if (mine != null && mine.exists()) mine.copyTo(theirs, overwrite = true)
+                        else { theirs.delete(); changed[owner.id] = ob.copy(backups = ob.backups - f) }
+                    }
+                    continue
+                }
                 kids.remove(key)?.delete()
                 kids.remove("$key.disabled")?.delete()
                 mod.backups[f]?.let { b ->
@@ -240,6 +288,7 @@ class ModManager(private val ctx: Context) {
                 }
             }
         }
+        changed.values.forEach { save(it) }
         mod.dirs.sortedByDescending { segs(it).size }.forEach { d ->
             val p = segs(d)
             if (idx.children(p)?.isEmpty() == true) idx.removeDir(p)
@@ -355,14 +404,24 @@ class ModManager(private val ctx: Context) {
         return cur.copy(size = total).also { save(it) }
     }
 
-    /** Disables a mod by renaming its files to *.disabled (restoring anything it overwrote), or re-enables it. */
-    fun setEnabled(dataUri: Uri, mod: Mod, enable: Boolean): Mod {
+    /** Disables a mod by renaming its files to *.disabled (restoring anything it overwrote), or re-enables it. Plugins follow. */
+    fun setEnabled(dataUri: Uri, mod: Mod, enable: Boolean, sync: Boolean = true): Mod {
         if (mod.enabled == enable) return mod
         var done = 0
         val title = (if (enable) "Enabling " else "Disabling ") + mod.name
         Progress.report(title, "Preparing…", null, force = true)
         val idx = Idx(dataRoot(dataUri))
         val bdir = File(backupRoot, mod.id)
+        val newer = HashSet<String>() // files a newer enabled mod owns
+        for (o in list().filter { it.id != mod.id && it.enabled && it.time > mod.time }) for (f in o.files) newer += normPath(f)
+        if (enable) { // refuse before changing anything if another mod took over a file while this one was off
+            val taken = mod.files.filter { f ->
+                val p = segs(f); val kids = idx.children(p.dropLast(1)); val key = p.last().lowercase()
+                kids != null && kids.containsKey("$key.disabled") && ((f !in mod.backups && kids.containsKey(key)) || normPath(f) in newer)
+            }
+            if (taken.isNotEmpty()) error("Can't enable ${mod.name}: ${taken.size} of its files are now provided by another mod (for example ${taken.first()}). Disable or uninstall that mod first.")
+        }
+        val backups = mod.backups.toMutableMap()
         for ((parent, group) in mod.files.groupBy { segs(it).dropLast(1) }) {
             val dir = idx.dir(parent) ?: continue
             val kids = idx.children(parent) ?: continue
@@ -370,6 +429,7 @@ class ModManager(private val ctx: Context) {
                 val name = segs(f).last(); val key = name.lowercase()
                 Progress.report(title, f, (++done).toFloat() / mod.files.size)
                 if (!enable) {
+                    if (normPath(f) in newer) continue // a newer mod owns the live file; leave it alone
                     val file = kids.remove(key) ?: continue
                     if (!file.renameTo("$name.disabled")) error("Cannot rename $name")
                     kids["$key.disabled"] = file
@@ -381,18 +441,20 @@ class ModManager(private val ctx: Context) {
                     }
                 } else {
                     val off = kids.remove("$key.disabled") ?: continue
-                    mod.backups[f]?.let { b ->
-                        kids.remove(key)?.let { cur ->
-                            cr.openInputStream(cur.uri)!!.use { i -> File(bdir, b).outputStream().use { i.copyTo(it, BUF) } }
+                    if (f in backups) {
+                        val cur = kids.remove(key)
+                        if (cur != null) {
+                            cr.openInputStream(cur.uri)!!.use { i -> File(bdir, backups[f]!!).outputStream().use { i.copyTo(it, BUF) } }
                             cur.delete()
-                        }
+                        } else backups.remove(f) // nothing underneath any more, so there is nothing to restore later
                     }
                     if (!off.renameTo(name)) error("Cannot rename $name")
                     kids[key] = off
                 }
             }
         }
-        return mod.copy(enabled = enable).also { save(it) }
+        val changed = if (sync) syncPlugins(dataUri, mod, if (enable) Sync.RESTORE else Sync.DEACTIVATE) else emptyList()
+        return mod.copy(enabled = enable, backups = backups, wasActive = if (enable) emptyList() else changed).also { save(it) }
     }
 
     /** Reads plugins.txt. Returns (usesAsterisks, entries): LE lists only active plugins in load order; SE-style marks active ones with *. */
@@ -410,16 +472,298 @@ class ModManager(private val ctx: Context) {
         cr.openOutputStream(uri, "wt")!!.use { it.write((out.joinToString("\r\n") + "\r\n").toByteArray(Charsets.UTF_8)) }
     }
 
+    /** Free bytes on the volume holding the Data folder, or null if that can't be told. */
+    private fun freeSpace(dataUri: Uri): Long? {
+        val r = rootOf(dataUri) ?: return null
+        if (r.uri.scheme == "file") return File(r.uri.path!!).usableSpace
+        val id = runCatching { DocumentsContract.getTreeDocumentId(dataUri) }.getOrNull() ?: return null
+        return if (id.substringBefore(':') == "primary") Environment.getExternalStorageDirectory().usableSpace else null
+    }
+
+    /** Returns a message if there isn't room to stage this archive in the app's temporary storage. */
+    fun checkRoom(archive: Uri): String? {
+        val size = DocumentFile.fromSingleUri(ctx, archive)?.length() ?: return null
+        val need = size * 3 / 2 + (50L shl 20) // staged copy, plus extra room when a RAR has to be unpacked
+        val free = ctx.cacheDir.usableSpace
+        return if (size > 0 && free < need) "Not enough free storage for the temporary copy of this archive: ${fmtSize(need)} needed, ${fmtSize(free)} free." else null
+    }
+
+    /** Checks a mod's files against the disk. Returns (missing, changed). Files a newer mod now owns are not judged. */
+    fun verify(dataUri: Uri, mod: Mod): Pair<List<String>, List<String>> {
+        val idx = Idx(dataRoot(dataUri))
+        val newer = HashSet<String>()
+        for (o in list().filter { it.id != mod.id && it.enabled && it.time > mod.time }) for (f in o.files) newer += normPath(f)
+        val missing = mutableListOf<String>(); val changed = mutableListOf<String>()
+        for ((parent, group) in mod.files.groupBy { segs(it).dropLast(1) }) {
+            val kids = idx.children(parent)
+            for (f in group) {
+                val key = segs(f).last().lowercase()
+                val file = kids?.get(if (mod.enabled) key else "$key.disabled")
+                if (file == null) { if (mod.enabled || normPath(f) !in newer) missing += f; continue }
+                val expected = mod.fsizes[f]
+                if (expected != null && normPath(f) !in newer && file.length() != expected) changed += f
+            }
+        }
+        return missing to changed
+    }
+
+    fun updateDetails(id: String, name: String, version: String, note: String, link: String): Mod? =
+        list().firstOrNull { it.id == id }?.copy(name = name.trim().ifBlank { "Unnamed mod" }, version = version.trim(), note = note.trim(), link = link.trim())?.also { save(it) }
+
+    private fun orderBackupDir(dataUri: Uri?): DocumentFile? = dataUri?.let { rootOf(it) }?.let { Idx(it).dir(listOf("SkyrimMM Backups", "Load order")) }
+
+    /** Timestamps of the saved load order backups, newest first. */
+    fun listOrderBackups(dataUri: Uri?): List<String> {
+        val names = orderBackupDir(dataUri)?.listFiles()?.mapNotNull { it.name } ?: File(ctx.filesDir, "order_backups").list()?.toList().orEmpty()
+        return names.filter { it.startsWith("Plugins-") && it.endsWith(".txt") }.map { it.removePrefix("Plugins-").removeSuffix(".txt") }.sortedDescending()
+    }
+
+    /** Puts a saved Plugins.txt / loadorder.txt back (the current ones are backed up first). */
+    fun restoreOrderBackup(dataUri: Uri?, f: OrderFiles, stamp: String): String {
+        val note = backupOrder(dataUri, f)
+        val d = orderBackupDir(dataUri)
+        fun read(label: String): ByteArray? =
+            if (d != null) d.listFiles().firstOrNull { it.name == "$label-$stamp.txt" }?.let { x -> cr.openInputStream(x.uri)!!.use { it.readBytes() } }
+            else File(File(ctx.filesDir, "order_backups"), "$label-$stamp.txt").takeIf { it.exists() }?.readBytes()
+        val plug = read("Plugins") ?: error("That backup has no Plugins file.")
+        val p = f.plugins ?: f.dir?.let { newFile(it, "Plugins.txt") }?.uri ?: error("No plugins.txt selected")
+        cr.openOutputStream(p, "wt")!!.use { it.write(plug) }
+        read("loadorder")?.let { lo ->
+            val u = f.loadOrder ?: f.dir?.let { newFile(it, "loadorder.txt") }?.uri
+            if (u != null) cr.openOutputStream(u, "wt")!!.use { it.write(lo) }
+        }
+        return "Restored the load order from $stamp. $note"
+    }
+
+    // ---------------- profiles and shareable setups ----------------
+    private val profDir = File(ctx.filesDir, "profiles").apply { mkdirs() }
+
+    fun profiles(): List<Profile> = profDir.listFiles { f -> f.extension == "json" }.orEmpty()
+        .mapNotNull { f -> runCatching { parseProfile(f.readText(), f.nameWithoutExtension) }.getOrNull() }.sortedBy { it.name.lowercase() }
+
+    fun saveProfile(p: Profile) = File(profDir, "${p.id}.json").writeText(profileJson(p))
+    fun deleteProfile(p: Profile) { File(profDir, "${p.id}.json").delete() }
+
+    fun profileJson(p: Profile): String = JSONObject().put("app", "SkyrimMM").put("name", p.name)
+        .put("enabled", JSONArray(p.enabled))
+        .put("order", JSONArray(p.order.map { JSONObject().put("name", it.name).put("active", it.active) }))
+        .put("mods", JSONArray(p.mods.map { JSONObject().put("name", it.name).put("version", it.version).put("link", it.link) })).toString(2)
+
+    fun parseProfile(json: String, id: String = UUID.randomUUID().toString().take(8)): Profile {
+        val o = JSONObject(json.trim())
+        val en = o.optJSONArray("enabled")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty()
+        val ord = o.optJSONArray("order")?.let { a -> List(a.length()) { i -> a.getJSONObject(i).let { PluginEntry(it.getString("name"), it.optBoolean("active", true)) } } }.orEmpty()
+        val ms = o.optJSONArray("mods")?.let { a -> List(a.length()) { i -> a.getJSONObject(i).let { ProfMod(it.getString("name"), it.optString("version"), it.optString("link")) } } }.orEmpty()
+        return Profile(id, o.optString("name", "Imported setup"), en, ord, ms)
+    }
+
+    /** A snapshot of which mods are on and the current plugin order. */
+    fun captureProfile(name: String, dataUri: Uri?): Profile {
+        val ms = list()
+        val ord = runCatching { readOrder(orderFiles(dataUri, manualPlugins)).second }.getOrDefault(emptyList())
+        return Profile(UUID.randomUUID().toString().take(8), name, ms.filter { it.enabled }.map { it.name }, ord, ms.map { ProfMod(it.name, it.version, it.link) })
+    }
+
+    /** Switches to a profile: turns exactly its mods on (matched by name), then writes its plugin order once. */
+    fun applyProfile(dataUri: Uri, p: Profile): String {
+        val want = p.enabled.map { it.lowercase() }.toSet()
+        val installed = list()
+        var changed = 0
+        for (m in installed) {
+            val on = m.name.lowercase() in want
+            if (on != m.enabled) { setEnabled(dataUri, m, on, sync = false); changed++ }
+        }
+        val missing = p.enabled.filter { n -> installed.none { it.name.equals(n, true) } }
+        var note = ""
+        if (p.order.isNotEmpty()) {
+            val f = orderFiles(dataUri, manualPlugins)
+            note = if (f.plugins != null || f.dir != null) writeOrder(f, readOrder(f).first, p.order, dataUri)
+            else "No plugins.txt is linked, so the load order was not changed."
+        }
+        return "Switched to ${p.name}: $changed mod(s) changed." + (if (missing.isNotEmpty()) " Not installed: ${missing.joinToString()}." else "") + " $note"
+    }
+
+    // ---------------- Skyrim.ini helper ----------------
+    private fun iniBytes(uri: Uri): ByteArray {
+        val b = cr.openInputStream(uri)!!.use { it.readBytes() }
+        if (b.size >= 2 && (b[0] == 0xFF.toByte() || b[0] == 0xFE.toByte())) error("This ini file uses UTF-16, which is not supported.")
+        return b
+    }
+
+    /** (loose files enabled, data dirs cleared): bInvalidateOlderFiles=1 and an empty sResourceDataDirsFinal in [Archive]. */
+    fun iniState(uri: Uri): Pair<Boolean, Boolean> {
+        var sec = ""; var inv = false; var dirsEmpty = false
+        for (l in String(iniBytes(uri), Charsets.ISO_8859_1).lines()) {
+            val t = l.trim()
+            if (t.startsWith("[")) { sec = t.lowercase(); continue }
+            if (sec != "[archive]") continue
+            val k = t.substringBefore('=').trim().lowercase(); val v = t.substringAfter('=', "").trim()
+            if (k == "binvalidateolderfiles") inv = v == "1"
+            if (k == "sresourcedatadirsfinal") dirsEmpty = v.isEmpty()
+        }
+        return inv to dirsEmpty
+    }
+
+    fun applyIni(uri: Uri, looseFiles: Boolean, dataUri: Uri?): String {
+        val bytes = iniBytes(uri)
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+        val dir = dataUri?.let { rootOf(it) }?.let { Idx(it).dir(listOf("SkyrimMM Backups", "Ini"), mutableListOf()) }
+        if (dir != null) newFile(dir, "Skyrim-$stamp.ini")?.let { out -> cr.openOutputStream(out.uri, "wt")!!.use { it.write(bytes) } }
+        else File(File(ctx.filesDir, "order_backups").apply { mkdirs() }, "Skyrim-$stamp.ini").writeBytes(bytes)
+        val text = String(bytes, Charsets.ISO_8859_1)
+        val nl = if (text.contains("\r\n")) "\r\n" else "\n"
+        val lines = text.split(Regex("\r?\n")).toMutableList()
+        var start = lines.indexOfFirst { it.trim().equals("[Archive]", true) }
+        if (start < 0) { lines += "[Archive]"; start = lines.size - 1 }
+        var end = (start + 1 until lines.size).firstOrNull { lines[it].trim().startsWith("[") } ?: lines.size
+        fun setKey(key: String, value: String) {
+            val i = (start + 1 until end).firstOrNull { lines[it].substringBefore('=').trim().equals(key, true) }
+            if (i != null) lines[i] = "$key=$value" else { lines.add(end, "$key=$value"); end++ }
+        }
+        if (looseFiles) { setKey("bInvalidateOlderFiles", "1"); setKey("sResourceDataDirsFinal", "") }
+        else { setKey("bInvalidateOlderFiles", "0"); setKey("sResourceDataDirsFinal", "STRINGS\\") }
+        cr.openOutputStream(uri, "wt")!!.use { it.write(lines.joinToString(nl).toByteArray(Charsets.ISO_8859_1)) }
+        return "Skyrim.ini updated (loose files ${if (looseFiles) "on" else "off"}). A backup was saved first."
+    }
+
+    // ---------------- troubleshooting (bisecting mods) ----------------
+    fun troubleState(): Trouble? = File(ctx.filesDir, "trouble.json").takeIf { it.exists() }?.let { f ->
+        runCatching {
+            val o = JSONObject(f.readText())
+            fun ids(k: String) = o.optJSONArray(k)?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty()
+            Trouble(o.getString("phase"), ids("original"), ids("cands"), ids("good"), ids("testing"))
+        }.getOrNull()
+    }
+
+    private fun saveTrouble(t: Trouble?) {
+        val f = File(ctx.filesDir, "trouble.json")
+        if (t == null) f.delete()
+        else f.writeText(JSONObject().put("phase", t.phase).put("original", JSONArray(t.original)).put("cands", JSONArray(t.cands))
+            .put("good", JSONArray(t.good)).put("testing", JSONArray(t.testing)).toString())
+    }
+
+    /** Turns exactly the mods with these ids on and all others off. The plugin list is left alone. */
+    private fun applyEnabled(dataUri: Uri, ids: Set<String>): Int {
+        var n = 0
+        for (m in list()) {
+            val on = m.id in ids
+            if (on == m.enabled) continue
+            runCatching { setEnabled(dataUri, m, on, sync = false) }.onSuccess { n++ }.onFailure { addNote("${m.name}: ${it.message}") }
+        }
+        return n
+    }
+
+    fun troubleStart(dataUri: Uri): String {
+        val orig = list().filter { it.enabled }.map { it.id }
+        saveTrouble(Trouble("alloff", orig, orig, emptyList(), emptyList()))
+        applyEnabled(dataUri, emptySet())
+        return "All mods are off. Start the game: does the problem still happen?"
+    }
+
+    fun troubleRestore(dataUri: Uri): String {
+        val t = troubleState()
+        if (t != null) applyEnabled(dataUri, t.original.toSet())
+        saveTrouble(null)
+        return "Your mods are back to how they were."
+    }
+
+    fun troubleAnswer(dataUri: Uri, problemStillThere: Boolean): String {
+        val t = troubleState() ?: return "There is no troubleshooting session."
+        if (t.phase == "alloff") {
+            if (problemStillThere) { troubleRestore(dataUri); return "The problem happens with every mod off, so these mods are not the cause. Everything was switched back on." }
+            return troubleNext(dataUri, Trouble("bisect", t.original, t.original, emptyList(), emptyList()))
+        }
+        val next = if (problemStillThere) Trouble("bisect", t.original, t.testing, t.good, emptyList())
+        else Trouble("bisect", t.original, t.cands - t.testing.toSet(), t.good + t.testing, emptyList())
+        return troubleNext(dataUri, next)
+    }
+
+    private fun troubleNext(dataUri: Uri, t: Trouble): String {
+        if (t.cands.size <= 1) {
+            val culprit = list().firstOrNull { it.id == t.cands.firstOrNull() }?.name
+            applyEnabled(dataUri, t.original.toSet() - t.cands.toSet())
+            saveTrouble(null)
+            return if (culprit != null) "The likely cause is $culprit. It is switched off and every other mod is back on. If the problem needs two mods together, this can be wrong."
+            else "No single mod could be blamed. Your mods are back to how they were."
+        }
+        val half = t.cands.take((t.cands.size + 1) / 2)
+        applyEnabled(dataUri, (t.good + half).toSet())
+        saveTrouble(Trouble("bisect", t.original, t.cands, t.good, half))
+        return "Testing: ${half.size} of ${t.cands.size} suspect mods are on. Start the game and tell me whether the problem happens."
+    }
+
+    /** Set by the UI: the plugins.txt picked by hand (used when there is no port folder). */
+    @Volatile var manualPlugins: Uri? = null
+    @Volatile private var note: String? = null
+    fun takeNote(): String? = note.also { note = null }
+    private fun addNote(s: String) { note = listOfNotNull(note, s).joinToString(" ") }
+
+    fun hasOrderFiles(dataUri: Uri?): Boolean = runCatching { orderFiles(dataUri, manualPlugins) }.getOrNull()?.let { it.dir != null || it.plugins != null } == true
+
+    /** Keeps plugins.txt / loadorder.txt in step with a mod (with a backup first). Returns the plugin names it changed; never throws. */
+    fun syncPlugins(dataUri: Uri?, mod: Mod, mode: Sync): List<String> {
+        val mine = mod.plugins.map { it.substringAfterLast('/') }.distinctBy { it.lowercase() }
+        if (mine.isEmpty()) return emptyList()
+        return try {
+            val f = orderFiles(dataUri, manualPlugins)
+            if (f.plugins == null && f.dir == null) return emptyList()
+            val (star, cur) = readOrder(f)
+            val entries = cur.toMutableList()
+            val changed = mutableListOf<String>()
+            fun at(n: String) = entries.indexOfFirst { it.name.equals(n, true) }
+            fun activate(n: String) {
+                val i = at(n)
+                if (i < 0) {
+                    val pos = if (n.endsWith(".esm", true)) entries.indexOfLast { it.name.endsWith(".esm", true) } + 1 else entries.size
+                    entries.add(pos, PluginEntry(n, true)); changed += n
+                } else if (!entries[i].active) { entries[i] = entries[i].copy(active = true); changed += n }
+            }
+            when (mode) {
+                Sync.ACTIVATE -> mine.forEach { activate(it) }
+                Sync.RESTORE -> mod.wasActive.forEach { activate(it) }
+                Sync.DEACTIVATE -> mine.forEach { n ->
+                    val i = at(n)
+                    if (i >= 0 && entries[i].active) { entries[i] = entries[i].copy(active = false); changed += n }
+                }
+                Sync.REMOVE -> {
+                    val keep = list().filter { it.id != mod.id && it.enabled }.flatMap { it.plugins }.map { it.substringAfterLast('/').lowercase() }.toSet()
+                    mine.filter { it.lowercase() !in keep }.forEach { n -> val i = at(n); if (i >= 0) { entries.removeAt(i); changed += n } }
+                }
+            }
+            if (changed.isNotEmpty()) {
+                writeOrder(f, star, entries, dataUri)
+                addNote("Load order updated (${changed.size} plugin(s)); backup saved.")
+            }
+            changed
+        } catch (t: Throwable) {
+            addNote("Could not update the load order: ${t.message}"); emptyList()
+        }
+    }
+
+    /** Reads each listed plugin's header (master flag and master list) from Data, and which files exist there. */
+    fun scanPlugins(dataUri: Uri, names: Collection<String>): PluginScan {
+        val kids = runCatching { Idx(dataRoot(dataUri)).children(emptyList()) }.getOrNull() ?: return PluginScan(emptyMap(), emptySet())
+        val info = HashMap<String, PluginInfo>()
+        for (n in names) {
+            val f = kids[n.lowercase()] ?: continue
+            runCatching { cr.openInputStream(f.uri)!!.use { parsePluginHeader(n, it) } }.getOrNull()?.let { info[n.lowercase()] = it }
+        }
+        return PluginScan(info, kids.keys.toSet())
+    }
+
     private fun save(m: Mod) = File(store, "${m.id}.json").writeText(
         JSONObject().put("id", m.id).put("name", m.name).put("files", JSONArray(m.files))
-            .put("dirs", JSONArray(m.dirs)).put("backups", JSONObject(m.backups)).put("enabled", m.enabled).put("size", m.size).toString())
+            .put("dirs", JSONArray(m.dirs)).put("backups", JSONObject(m.backups)).put("enabled", m.enabled).put("size", m.size).put("time", m.time).put("wasActive", JSONArray(m.wasActive)).put("version", m.version).put("note", m.note).put("link", m.link)
+            .put("fsizes", JSONObject(m.fsizes)).toString())
 
     private fun load(f: File): Mod {
         val o = JSONObject(f.readText())
         fun JSONArray.strs() = List(length()) { getString(it) }
         val b = o.getJSONObject("backups")
         return Mod(o.getString("id"), o.getString("name"), o.getJSONArray("files").strs(),
-            o.getJSONArray("dirs").strs(), b.keys().asSequence().associateWith { b.getString(it) }, o.optBoolean("enabled", true), o.optLong("size", -1))
+            o.getJSONArray("dirs").strs(), b.keys().asSequence().associateWith { b.getString(it) }, o.optBoolean("enabled", true), o.optLong("size", -1), o.optLong("time", 0), o.optJSONArray("wasActive")?.strs().orEmpty(),
+            o.optString("version"), o.optString("note"), o.optString("link"),
+            o.optJSONObject("fsizes")?.let { j -> j.keys().asSequence().associateWith { j.getLong(it) } }.orEmpty())
     }
 }
 
@@ -486,4 +830,26 @@ private fun decodeText(b: ByteArray): String = when {
     b.size >= 2 && b[0] == 0xFF.toByte() && b[1] == 0xFE.toByte() -> String(b, Charsets.UTF_16LE)
     b.size >= 2 && b[0] == 0xFE.toByte() && b[1] == 0xFF.toByte() -> String(b, Charsets.UTF_16BE)
     else -> String(b, Charsets.UTF_8)
+}
+
+/** Parses a Skyrim LE plugin's TES4 header record: the master flag and the MAST subrecords. */
+private fun parsePluginHeader(name: String, s: InputStream): PluginInfo? {
+    fun u32(b: ByteArray, o: Int) = (b[o].toInt() and 0xFF) or ((b[o + 1].toInt() and 0xFF) shl 8) or
+            ((b[o + 2].toInt() and 0xFF) shl 16) or ((b[o + 3].toInt() and 0xFF) shl 24)
+    val h = s.readUpTo(24)
+    if (h.size < 24 || String(h, 0, 4, Charsets.ISO_8859_1) != "TES4") return null
+    val size = u32(h, 4); val flags = u32(h, 8)
+    if (size < 0 || size > 4_000_000) return null
+    val d = s.readUpTo(size)
+    val masters = mutableListOf<String>()
+    var p = 0
+    while (p + 6 <= d.size) {
+        val type = String(d, p, 4, Charsets.ISO_8859_1)
+        val len = (d[p + 4].toInt() and 0xFF) or ((d[p + 5].toInt() and 0xFF) shl 8)
+        p += 6
+        if (p + len > d.size) break
+        if (type == "MAST") { var e = p; while (e < p + len && d[e] != 0.toByte()) e++; masters += String(d, p, e - p, Charsets.ISO_8859_1) }
+        p += len
+    }
+    return PluginInfo(name, (flags and 1) != 0, masters)
 }
