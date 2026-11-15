@@ -86,52 +86,63 @@ fun VerifyDialog(mgr: ModManager, dataUri: Uri, mods: List<Mod>, onClose: () -> 
 @Composable
 fun ProfilesDialog(mgr: ModManager, dataUri: Uri, ctx: Context, tick: Int, task: TaskRunner, onStatus: (String) -> Unit, onClose: () -> Unit) {
     var profiles by remember(tick) { mutableStateOf(mgr.profiles()) }
+    val active = remember(tick) { mgr.activeProfile() }
     var name by remember { mutableStateOf("") }
     val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    fun create(empty: Boolean) {
+        val n = name.trim(); name = ""
+        task("Creating profile") {
+            val p = mgr.captureProfile(n, dataUri, empty)
+            mgr.saveProfile(p)
+            mgr.applyProfile(dataUri, p)
+        }
+    }
     AlertDialog(
-        onDismissRequest = onClose, title = { Text("Profiles and setups") },
+        onDismissRequest = onClose, title = { Text("Profiles") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(if (active != null) "Active profile: ${active.name}" else "No profile is active",
+                    style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Text("The active profile saves itself: turning mods on or off, installing, uninstalling and load order changes all go into it. Switching turns the right mods on and off and restores that profile's plugin order.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("New profile name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(enabled = name.isNotBlank(), onClick = {
-                        val n = name.trim(); name = ""
-                        task("Saving profile") { mgr.saveProfile(mgr.captureProfile(n, dataUri)); "Saved profile $n (enabled mods and load order)." }
-                    }) { Text("Save current") }
-                    OutlinedButton(onClick = {
-                        val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
-                        val p = runCatching { mgr.parseProfile(text) }.getOrNull()
-                        if (p == null) onStatus("The clipboard doesn't hold a Skyrim Mod Manager setup.")
-                        else {
-                            mgr.saveProfile(p); profiles = mgr.profiles()
-                            val installed = mgr.list()
-                            val missing = p.enabled.filter { n -> installed.none { it.name.equals(n, true) } }
-                            onStatus("Imported ${p.name}." + if (missing.isNotEmpty()) " Mods you still need: " + missing.joinToString { n ->
-                                p.mods.firstOrNull { it.name == n }?.link?.takeIf { it.isNotBlank() }?.let { "$n ($it)" } ?: n } else " All its mods are installed.")
-                        }
-                    }) { Text("Import from clipboard") }
+                    Button(enabled = name.isNotBlank(), onClick = { create(true) }) { Text("New: all mods off") }
+                    OutlinedButton(enabled = name.isNotBlank(), onClick = { create(false) }) { Text("Copy current") }
                 }
-                if (profiles.isEmpty()) Text("No profiles yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                LazyColumn(Modifier.heightIn(max = 300.dp)) {
+                Text("Creating a profile switches to it. “All mods off” starts clean so you can choose a different set of mods; “Copy current” starts from what is on now.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                LazyColumn(Modifier.heightIn(max = 280.dp)) {
                     items(profiles, key = { it.id }) { p ->
+                        val isActive = p.id == active?.id
                         ListItem(colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text(p.name) },
-                            supportingContent = { Text("${p.enabled.size} mods on · ${p.order.count { it.active }} plugins") },
+                            headlineContent = { Text(p.name + if (isActive) "  ✓" else "", fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal) },
+                            supportingContent = { Text("${p.enabled.size} mods on · ${p.order.count { it.active }} plugins" + if (isActive) " · active" else "") },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    TextButton(onClick = { onClose(); task("Switching profile") { mgr.applyProfile(dataUri, p) } }) { Text("Switch") }
+                                    TextButton(enabled = !isActive, onClick = { onClose(); task("Switching profile") { mgr.applyProfile(dataUri, p) } }) { Text("Switch") }
                                     IconButton(onClick = {
                                         ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                                             type = "text/plain"; putExtra(Intent.EXTRA_TEXT, mgr.profileJson(p)) }, "Share setup"))
                                     }) { Icon(Icons.Default.Share, "Share") }
-                                    IconButton(onClick = { mgr.deleteProfile(p); profiles = mgr.profiles() }) {
+                                    IconButton(enabled = !isActive, onClick = { mgr.deleteProfile(p); profiles = mgr.profiles() }) {
                                         Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
                                 }
                             })
                     }
                 }
-                Text("Sharing sends the setup as text. The other person copies it and uses Import from clipboard. Mods are matched by name.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                TextButton(onClick = {
+                    val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
+                    val p = runCatching { mgr.parseProfile(text) }.getOrNull()
+                    if (p == null) onStatus("The clipboard doesn't hold a Skyrim Mod Manager setup.")
+                    else {
+                        mgr.saveProfile(p); profiles = mgr.profiles()
+                        val installed = mgr.list()
+                        val missing = p.enabled.filter { n -> installed.none { it.name.equals(n, true) } }
+                        onStatus("Imported profile ${p.name}." + if (missing.isNotEmpty()) " Mods you still need: " + missing.joinToString { n ->
+                            p.mods.firstOrNull { it.name == n }?.link?.takeIf { it.isNotBlank() }?.let { "$n ($it)" } ?: n } else " All its mods are installed.")
+                    }
+                }) { Text("Import a shared setup from the clipboard") }
             }
         },
         confirmButton = { TextButton(onClick = onClose) { Text("Close") } })

@@ -5,7 +5,7 @@ val code = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
 android {
     namespace = "com.example.skyrimmm"
     compileSdk = 34
-    defaultConfig { applicationId = "com.example.skyrimmm"; minSdk = 26; targetSdk = 34; versionCode = code; versionName = (project.findProperty("versionName") as String?) ?: "1.2.0" }
+    defaultConfig { applicationId = "com.example.skyrimmm"; minSdk = 26; targetSdk = 34; versionCode = code; versionName = (project.findProperty("versionName") as String?) ?: "1.4.0" }
     // One fixed key for every build, so a new APK installs over the previous one instead of conflicting with it.
     signingConfigs {
         create("fixed") {

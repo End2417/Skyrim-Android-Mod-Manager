@@ -13,6 +13,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Settings
@@ -111,7 +114,7 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
     var tab by remember { mutableStateOf(0) }
     var port by remember { mutableStateOf<Boolean?>(null) }
     var pluginsUri by remember { mutableStateOf(prefs.getString("plugins", null)?.let(Uri::parse)) }
-    var skseZip by remember { mutableStateOf<Pair<Uri, List<String>>?>(null) }
+    var skseZip by remember { mutableStateOf<Triple<Uri, List<String>, List<String>>?>(null) }
     var confirm by remember { mutableStateOf<Mod?>(null) }
     var filesOf by remember { mutableStateOf<Mod?>(null) }
     var updateOf by remember { mutableStateOf<Mod?>(null) }
@@ -126,6 +129,11 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
     var tick by remember { mutableStateOf(0) }
     var iniUri by remember { mutableStateOf(prefs.getString("ini", null)?.let(Uri::parse)) }
     val pending = remember { mutableStateListOf<Uri>() }
+    var activeProfile by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(dataUri, tick) { // there is always an active profile; the first run creates "Default"
+        if (dataUri != null) withContext(Dispatchers.IO) { runCatching { mgr.ensureDefaultProfile(dataUri) } }
+        activeProfile = withContext(Dispatchers.IO) { runCatching { mgr.activeProfileName() }.getOrNull() }
+    }
     val shown = remember(mods, query, sort) {
         val q = query.trim().lowercase()
         mods.filter { q.isEmpty() || it.name.lowercase().contains(q) || it.note.lowercase().contains(q) || it.version.lowercase().contains(q) ||
@@ -190,6 +198,7 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
     /** Finishes an update: the old version goes (only files the new one doesn't replace are really deleted) and its on/off state carries over. */
     fun post(n: Mod, d: Uri): Mod {
         val o = updateOf ?: return n
+        mgr.renameInProfiles(o.name, n.name) // profiles follow the new version
         mgr.uninstall(d, o)
         val fresh = mgr.list().firstOrNull { it.id == n.id } ?: n
         return if (!o.enabled) mgr.setEnabled(d, fresh, false) else fresh
@@ -246,9 +255,9 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
         scope.launch {
             val problem = withContext(Dispatchers.IO) { runCatching { mgr.checkRoom(u) }.getOrNull() }
             if (problem != null) { status = problem; busy = false; prog = null; updateOf = null; return@launch }
-            val why = withContext(Dispatchers.IO) { runCatching { mgr.skseReasons(u) }.getOrDefault(emptyList()) }
+            val (why, se) = withContext(Dispatchers.IO) { runCatching { mgr.scanCompat(u) }.getOrDefault(emptyList<String>() to emptyList()) }
             busy = false
-            if (why.isNotEmpty()) { prog = null; skseZip = u to why } else begin(u)
+            if (why.isNotEmpty() || se.isNotEmpty()) { prog = null; skseZip = Triple(u, why, se) } else begin(u)
         }
     }
     val pickZip = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { us ->
@@ -261,17 +270,22 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
         if (!busy && wiz == null && skseZip == null && askPlugins == null && pending.isNotEmpty()) handle(pending.removeAt(0))
     }
 
-    skseZip?.let { (u, why) ->
+    skseZip?.let { (u, why, se) ->
         AlertDialog(
             onDismissRequest = { skseZip = null; updateOf = null },
-            title = { Text("SKSE mod detected") },
+            title = { Text(when { why.isNotEmpty() && se.isNotEmpty() -> "Compatibility warnings"; why.isNotEmpty() -> "SKSE mod detected"; else -> "Special Edition mod?" }) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("This mod appears to need SKSE (Skyrim Script Extender). SKSE is not supported by this app, so this mod should not work and may cause crashes or broken scripts. You can still install it and uninstall it completely later.")
-                    Text("Why it was flagged:", style = MaterialTheme.typography.titleSmall)
-                    why.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-                    Text("Detection is a best guess, so it can be wrong in both directions.", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    if (se.isNotEmpty()) {
+                        Text("This looks like a Special Edition (SE) mod. SE files can crash Legendary Edition, which cannot read their plugin, archive, mesh or texture formats.")
+                        se.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                    }
+                    if (why.isNotEmpty()) {
+                        Text("This mod appears to need SKSE (Skyrim Script Extender). SKSE is not supported by this app, so this mod should not work and may cause crashes or broken scripts.")
+                        why.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                    }
+                    Text("You can still install it and uninstall it completely later. Detection is a best guess, so it can be wrong in both directions.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                 }
             },
             confirmButton = { TextButton(onClick = { skseZip = null; begin(u) }) { Text("Install anyway") } },
@@ -437,7 +451,7 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
             Dashboard(dataUri, port, mods, busy, onFolder = { pickDir.launch(null) }, onInstall = {
                 updateOf = null
                 pickZip.launch(ARCHIVE_TYPES)
-            })
+            }, profile = activeProfile, onProfile = { tool = "profiles" })
             if (!fast && dataUri != null && Build.VERSION.SDK_INT >= 30) Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -456,7 +470,7 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
                     else io(if (on) "Enabled" else "Disabled") { mgr.setEnabled(dataUri!!, m, on) }
                 },
                 onUninstall = { confirm = it }, onShowFiles = { filesOf = it },
-                onUpdate = { m -> updateOf = m; pickZip.launch(ARCHIVE_TYPES) }, onConflicts = { conflictsOf = it }, onEdit = { editOf = it })
+                onUpdate = { m -> updateOf = m; pickZip.launch(ARCHIVE_TYPES) }, onConflicts = { conflictsOf = it }, onEdit = { editOf = it }, profileName = activeProfile)
         }
     }
 }
@@ -483,7 +497,8 @@ fun ProgressDialog(p: Prog) {
 }
 
 @Composable
-fun Dashboard(dataUri: Uri?, port: Boolean?, mods: List<Mod>, busy: Boolean, onFolder: () -> Unit, onInstall: () -> Unit) {
+fun Dashboard(dataUri: Uri?, port: Boolean?, mods: List<Mod>, busy: Boolean, onFolder: () -> Unit, onInstall: () -> Unit,
+              profile: String? = null, onProfile: () -> Unit = {}) {
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
@@ -493,6 +508,14 @@ fun Dashboard(dataUri: Uri?, port: Boolean?, mods: List<Mod>, busy: Boolean, onF
             } else {
                 Text(dataUri.lastPathSegment?.substringAfterLast(':') ?: "Game folder",
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Surface(modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onProfile() }, shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                        Text("Profile: ${profile ?: "none"}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text("  ▾", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatChip("${mods.size} mods")
                     StatChip("${mods.sumOf { it.plugins.size }} plugins")
@@ -527,7 +550,7 @@ private val ARCHIVE_TYPES = arrayOf("application/zip", "application/x-zip-compre
 @Composable
 fun ModList(mods: List<Mod>, allCount: Int, query: String, onQuery: (String) -> Unit, sort: Int, onSort: (Int) -> Unit,
             actionsEnabled: Boolean, conflicts: Map<String, List<Conflict>>, onToggle: (Mod, Boolean) -> Unit,
-            onUninstall: (Mod) -> Unit, onShowFiles: (Mod) -> Unit, onUpdate: (Mod) -> Unit, onConflicts: (Mod) -> Unit, onEdit: (Mod) -> Unit) {
+            onUninstall: (Mod) -> Unit, onShowFiles: (Mod) -> Unit, onUpdate: (Mod) -> Unit, onConflicts: (Mod) -> Unit, onEdit: (Mod) -> Unit, profileName: String? = null) {
     if (allCount > 0) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(value = query, onValueChange = onQuery, modifier = Modifier.weight(1f), singleLine = true,
@@ -553,7 +576,7 @@ fun ModList(mods: List<Mod>, allCount: Int, query: String, onQuery: (String) -> 
         }
         return
     }
-    Text("Installed mods", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    Text("Installed mods" + (profileName?.let { " · profile: $it" } ?: ""), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(mods, key = { it.id }) { m ->
             val cs = conflicts[m.id].orEmpty()

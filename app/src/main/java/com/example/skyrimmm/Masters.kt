@@ -1,7 +1,8 @@
 package com.example.skyrimmm
 
 /** What a plugin's header says: its master flag and the plugins it depends on. */
-class PluginInfo(val name: String, val isMaster: Boolean, val masters: List<String>)
+class PluginInfo(val name: String, val isMaster: Boolean, val masters: List<String>,
+                 val hedr: Float = 0f, val formVersion: Int = 0, val isLight: Boolean = false)
 
 /** Headers of the plugins in the load order, plus the names of every file present in Data (lower-case). */
 class PluginScan(val info: Map<String, PluginInfo>, val present: Set<String>)

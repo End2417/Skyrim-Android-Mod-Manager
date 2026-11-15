@@ -80,35 +80,67 @@ class ModManager(private val ctx: Context) {
 
     private fun entryNames(zipUri: Uri): List<String> = openArchive(ctx, zipUri).use { it.names() }
 
-    /** Best-effort reasons a mod needs SKSE (empty list = no sign of it). Checks files, compiled scripts, the FOMOD config and readmes. */
-    fun skseReasons(zipUri: Uri): List<String> {
-        Progress.report("Reading archive", "Checking for SKSE…", null, force = true)
-        val reasons = mutableListOf<String>()
+    /**
+     * One pass over an archive looking for two kinds of trouble. Returns (SKSE reasons, Special Edition reasons); empty lists mean no sign of it.
+     * SKSE: plugin files, compiled scripts, the FOMOD config, readmes. SE: plugin headers and the ESL flag, BSA version, 64-bit SKSE DLLs,
+     * SE mesh format and BC7 textures. All best-effort guesses.
+     */
+    fun scanCompat(zipUri: Uri): Pair<List<String>, List<String>> {
+        Progress.report("Reading archive", "Checking compatibility…", null, force = true)
+        val skse = mutableListOf<String>(); val se = mutableListOf<String>()
         openArchive(ctx, zipUri).use { arch ->
             arch.names().firstOrNull { n ->
                 val s = segs(n).map { it.lowercase() }
                 "skse" in s.dropLast(1) || s.last().let { it.startsWith("skse") && (it.endsWith(".dll") || it.endsWith(".exe")) }
-            }?.let { reasons += "It ships SKSE plugin files (${segs(it).takeLast(2).joinToString("/")})" }
+            }?.let { skse += "It ships SKSE plugin files (${segs(it).takeLast(2).joinToString("/")})" }
             var pex = 0; var scripts = false; var installer = false; var readme = false
+            var plugins = 0; var bsas = 0; var nifs = 0; var ddss = 0
+            var sePlugin = false; var seBsa = false; var seDll = false; var seNif = false; var seDds = false
             arch.forEach { n, s ->
                 val low = n.lowercase()
                 val file = segs(n).lastOrNull().orEmpty()
+                val dirs = segs(n).dropLast(1).map { it.lowercase() }
                 when {
                     !scripts && low.endsWith(".pex") && pex++ < 300 -> {
                         val txt = String(s.readUpTo(400_000), Charsets.ISO_8859_1)
-                        SKSE_TERMS.firstOrNull { it in txt }?.let { reasons += "Its scripts ($file) use SKSE-only features (found: $it)"; scripts = true }
+                        SKSE_TERMS.firstOrNull { it in txt }?.let { skse += "Its scripts ($file) use SKSE-only features (found: $it)"; scripts = true }
                     }
                     !installer && low.endsWith("moduleconfig.xml") -> {
-                        if ("skse" in decodeText(s.readUpTo(500_000)).lowercase()) { reasons += "Its installer (ModuleConfig.xml) mentions SKSE"; installer = true }
+                        if ("skse" in decodeText(s.readUpTo(500_000)).lowercase()) { skse += "Its installer (ModuleConfig.xml) mentions SKSE"; installer = true }
                     }
                     !readme && (low.endsWith(".txt") || low.endsWith(".md") || low.endsWith(".rtf")) && !low.endsWith("plugins.txt") -> {
-                        if (readmeNeedsSkse(decodeText(s.readUpTo(200_000)))) { reasons += "A readme ($file) says it requires SKSE"; readme = true }
+                        if (readmeNeedsSkse(decodeText(s.readUpTo(200_000)))) { skse += "A readme ($file) says it requires SKSE"; readme = true }
+                    }
+                    !sePlugin && (low.endsWith(".esp") || low.endsWith(".esm") || low.endsWith(".esl")) && plugins++ < 20 -> {
+                        parsePluginHeader(file, s)?.let { info ->
+                            when {
+                                info.isLight -> { se += "Plugin $file is flagged ESL, which only Special Edition supports"; sePlugin = true }
+                                info.hedr >= 1.0f || info.formVersion >= 44 -> { se += "Plugin $file was saved for Special Edition (header version ${"%.2f".format(info.hedr)})"; sePlugin = true }
+                                else -> {}
+                            }
+                        }
+                    }
+                    !seBsa && low.endsWith(".bsa") && bsas++ < 5 -> {
+                        val h = s.readUpTo(8)
+                        if (h.size >= 8 && h[0] == 'B'.code.toByte() && h[1] == 'S'.code.toByte() && h[2] == 'A'.code.toByte() && u32le(h, 4) == 105) {
+                            se += "Archive $file uses the Special Edition BSA format"; seBsa = true
+                        }
+                    }
+                    !seDll && low.endsWith(".dll") && "skse" in dirs -> {
+                        if (peMachine(s.readUpTo(1024)) == 0x8664) { se += "SKSE plugin $file is a 64-bit DLL (SKSE64, Special Edition)"; seDll = true }
+                    }
+                    !seNif && low.endsWith(".nif") && nifs++ < 6 -> {
+                        if (nifBsVersion(s.readUpTo(128)) == 100) { se += "Mesh $file uses the Special Edition format"; seNif = true }
+                    }
+                    !seDds && low.endsWith(".dds") && ddss++ < 12 -> {
+                        val dxgi = ddsDxgi(s.readUpTo(148))
+                        if (dxgi == 98 || dxgi == 99) { se += "Texture $file uses BC7 compression, which Legendary Edition cannot read"; seDds = true }
                     }
                 }
-                !(scripts && installer && readme)
+                true
             }
         }
-        return reasons
+        return skse to se
     }
 
     /** Which of the given paths (relative to Data) exist, normalised with normPath. */
@@ -242,13 +274,15 @@ class ModManager(private val ctx: Context) {
         } catch (t: Throwable) {
             removeFiles(dataUri, Mod(id, name, files, dirs, backups, time = System.currentTimeMillis())); throw friendly(t)
         } finally { Stage.clear(ctx) }
-        return Mod(id, name, files, dirs, backups, true, bytes, System.currentTimeMillis(), fsizes = sizes).also { save(it) }
+        return Mod(id, name, files, dirs, backups, true, bytes, System.currentTimeMillis(), fsizes = sizes).also { save(it); syncActiveProfile(dataUri) }
     }
 
     /** Removes a mod: its files (except any a newer mod now owns), restores originals it overwrote, and takes its plugins out of the load order. */
     fun uninstall(dataUri: Uri, mod: Mod) {
         removeFiles(dataUri, mod)
         syncPlugins(dataUri, mod, Sync.REMOVE)
+        if (list().none { it.name.equals(mod.name, true) }) removeFromProfiles(mod.name)
+        syncActiveProfile(dataUri)
     }
 
     private fun removeFiles(dataUri: Uri, mod: Mod) {
@@ -386,6 +420,7 @@ class ModManager(private val ctx: Context) {
             val lo = f.loadOrder ?: newFile(d, "loadorder.txt")?.uri ?: error("Cannot create loadorder.txt")
             cr.openOutputStream(lo, "wt")!!.use { it.write((list.joinToString("\r\n") { e -> e.name } + "\r\n").toByteArray(Charsets.UTF_8)) }
         }
+        syncActiveProfile(dataUri)
         return note
     }
 
@@ -454,7 +489,7 @@ class ModManager(private val ctx: Context) {
             }
         }
         val changed = if (sync) syncPlugins(dataUri, mod, if (enable) Sync.RESTORE else Sync.DEACTIVATE) else emptyList()
-        return mod.copy(enabled = enable, backups = backups, wasActive = if (enable) emptyList() else changed).also { save(it) }
+        return mod.copy(enabled = enable, backups = backups, wasActive = if (enable) emptyList() else changed).also { save(it); syncActiveProfile(dataUri) }
     }
 
     /** Reads plugins.txt. Returns (usesAsterisks, entries): LE lists only active plugins in load order; SE-style marks active ones with *. */
@@ -507,8 +542,13 @@ class ModManager(private val ctx: Context) {
         return missing to changed
     }
 
-    fun updateDetails(id: String, name: String, version: String, note: String, link: String): Mod? =
-        list().firstOrNull { it.id == id }?.copy(name = name.trim().ifBlank { "Unnamed mod" }, version = version.trim(), note = note.trim(), link = link.trim())?.also { save(it) }
+    fun updateDetails(id: String, name: String, version: String, note: String, link: String): Mod? {
+        val old = list().firstOrNull { it.id == id } ?: return null
+        val n = old.copy(name = name.trim().ifBlank { "Unnamed mod" }, version = version.trim(), note = note.trim(), link = link.trim())
+        if (!n.name.equals(old.name, true)) renameInProfiles(old.name, n.name) // profiles follow a rename
+        save(n); syncActiveProfile(null)
+        return n
+    }
 
     private fun orderBackupDir(dataUri: Uri?): DocumentFile? = dataUri?.let { rootOf(it) }?.let { Idx(it).dir(listOf("SkyrimMM Backups", "Load order")) }
 
@@ -532,6 +572,7 @@ class ModManager(private val ctx: Context) {
             val u = f.loadOrder ?: f.dir?.let { newFile(it, "loadorder.txt") }?.uri
             if (u != null) cr.openOutputStream(u, "wt")!!.use { it.write(lo) }
         }
+        syncActiveProfile(dataUri)
         return "Restored the load order from $stamp. $note"
     }
 
@@ -542,7 +583,10 @@ class ModManager(private val ctx: Context) {
         .mapNotNull { f -> runCatching { parseProfile(f.readText(), f.nameWithoutExtension) }.getOrNull() }.sortedBy { it.name.lowercase() }
 
     fun saveProfile(p: Profile) = File(profDir, "${p.id}.json").writeText(profileJson(p))
-    fun deleteProfile(p: Profile) { File(profDir, "${p.id}.json").delete() }
+    fun deleteProfile(p: Profile) {
+        File(profDir, "${p.id}.json").delete()
+        if (activeFile.exists() && activeFile.readText().trim() == p.id) activeFile.delete()
+    }
 
     fun profileJson(p: Profile): String = JSONObject().put("app", "SkyrimMM").put("name", p.name)
         .put("enabled", JSONArray(p.enabled))
@@ -557,30 +601,80 @@ class ModManager(private val ctx: Context) {
         return Profile(id, o.optString("name", "Imported setup"), en, ord, ms)
     }
 
-    /** A snapshot of which mods are on and the current plugin order. */
-    fun captureProfile(name: String, dataUri: Uri?): Profile {
+    /**
+     * A profile's state: which mods are on and the plugin order. With `empty`, every mod starts off (and their plugins inactive),
+     * so a new profile can be a genuinely different set instead of a copy.
+     */
+    fun captureProfile(name: String, dataUri: Uri?, empty: Boolean = false): Profile {
         val ms = list()
         val ord = runCatching { readOrder(orderFiles(dataUri, manualPlugins)).second }.getOrDefault(emptyList())
-        return Profile(UUID.randomUUID().toString().take(8), name, ms.filter { it.enabled }.map { it.name }, ord, ms.map { ProfMod(it.name, it.version, it.link) })
+        val infos = ms.map { ProfMod(it.name, it.version, it.link) }
+        val id = UUID.randomUUID().toString().take(8)
+        if (!empty) return Profile(id, name, ms.filter { it.enabled }.map { it.name }, ord, infos)
+        val modPlugins = ms.flatMap { it.plugins }.map { it.substringAfterLast('/').lowercase() }.toSet()
+        return Profile(id, name, emptyList(), ord.map { if (it.name.lowercase() in modPlugins) it.copy(active = false) else it }, infos)
     }
 
-    /** Switches to a profile: turns exactly its mods on (matched by name), then writes its plugin order once. */
+    private val activeFile = File(ctx.filesDir, "active_profile.txt")
+    @Volatile private var suspendSync = false
+
+    fun activeProfile(): Profile? {
+        val id = activeFile.takeIf { it.exists() }?.readText()?.trim().orEmpty()
+        return profiles().firstOrNull { it.id == id }
+    }
+    fun activeProfileName(): String? = activeProfile()?.name
+    private fun setActive(p: Profile?) { if (p == null) activeFile.delete() else activeFile.writeText(p.id) }
+
+    /** There is always an active profile: the first run creates "Default" from the current state. */
+    fun ensureDefaultProfile(dataUri: Uri?) {
+        val all = profiles()
+        if (all.isEmpty()) captureProfile("Default", dataUri).also { saveProfile(it); setActive(it) }
+        else if (activeProfile() == null) setActive(all.first())
+    }
+
+    /** The active profile follows every change: mods turned on or off, installs, uninstalls and load order edits are saved into it. */
+    fun syncActiveProfile(dataUri: Uri?) {
+        if (suspendSync) return
+        runCatching {
+            val a = activeProfile() ?: return
+            val cur = captureProfile(a.name, dataUri)
+            saveProfile(Profile(a.id, a.name, cur.enabled, if (cur.order.isEmpty()) a.order else cur.order, cur.mods))
+        }
+    }
+
+    private fun editProfiles(f: (Profile) -> Profile?) {
+        for (p in profiles()) { val n = f(p); if (n != null) saveProfile(n) }
+    }
+    fun renameInProfiles(old: String, new: String) = editProfiles { p ->
+        if (p.enabled.none { it.equals(old, true) }) null
+        else Profile(p.id, p.name, p.enabled.map { if (it.equals(old, true)) new else it }, p.order,
+            p.mods.map { if (it.name.equals(old, true)) ProfMod(new, it.version, it.link) else it })
+    }
+    fun removeFromProfiles(name: String) = editProfiles { p ->
+        if (p.enabled.none { it.equals(name, true) }) null else Profile(p.id, p.name, p.enabled.filterNot { it.equals(name, true) }, p.order, p.mods)
+    }
+
+    /** Switches to a profile: turns exactly its mods on (matched by name), writes its plugin order once, and makes it the active profile. */
     fun applyProfile(dataUri: Uri, p: Profile): String {
-        val want = p.enabled.map { it.lowercase() }.toSet()
-        val installed = list()
-        var changed = 0
-        for (m in installed) {
-            val on = m.name.lowercase() in want
-            if (on != m.enabled) { setEnabled(dataUri, m, on, sync = false); changed++ }
-        }
-        val missing = p.enabled.filter { n -> installed.none { it.name.equals(n, true) } }
-        var note = ""
-        if (p.order.isNotEmpty()) {
-            val f = orderFiles(dataUri, manualPlugins)
-            note = if (f.plugins != null || f.dir != null) writeOrder(f, readOrder(f).first, p.order, dataUri)
-            else "No plugins.txt is linked, so the load order was not changed."
-        }
-        return "Switched to ${p.name}: $changed mod(s) changed." + (if (missing.isNotEmpty()) " Not installed: ${missing.joinToString()}." else "") + " $note"
+        suspendSync = true
+        try {
+            val want = p.enabled.map { it.lowercase() }.toSet()
+            val installed = list()
+            var changed = 0
+            for (m in installed) {
+                val on = m.name.lowercase() in want
+                if (on != m.enabled) { setEnabled(dataUri, m, on, sync = false); changed++ }
+            }
+            val missing = p.enabled.filter { n -> installed.none { it.name.equals(n, true) } }
+            var note = ""
+            if (p.order.isNotEmpty()) {
+                val f = orderFiles(dataUri, manualPlugins)
+                note = if (f.plugins != null || f.dir != null) writeOrder(f, readOrder(f).first, p.order, dataUri)
+                else "No plugins.txt is linked, so the load order was not changed."
+            }
+            setActive(p)
+            return "Switched to profile ${p.name}: $changed mod(s) changed." + (if (missing.isNotEmpty()) " Not installed: ${missing.joinToString()}." else "") + " $note"
+        } finally { suspendSync = false }
     }
 
     // ---------------- Skyrim.ini helper ----------------
@@ -644,6 +738,11 @@ class ModManager(private val ctx: Context) {
 
     /** Turns exactly the mods with these ids on and all others off. The plugin list is left alone. */
     private fun applyEnabled(dataUri: Uri, ids: Set<String>): Int {
+        suspendSync = true
+        try { return applyEnabledRaw(dataUri, ids) } finally { suspendSync = false }
+    }
+
+    private fun applyEnabledRaw(dataUri: Uri, ids: Set<String>): Int {
         var n = 0
         for (m in list()) {
             val on = m.id in ids
@@ -683,6 +782,7 @@ class ModManager(private val ctx: Context) {
             val culprit = list().firstOrNull { it.id == t.cands.firstOrNull() }?.name
             applyEnabled(dataUri, t.original.toSet() - t.cands.toSet())
             saveTrouble(null)
+            syncActiveProfile(dataUri) // the culprit stays off, so the profile now says so
             return if (culprit != null) "The likely cause is $culprit. It is switched off and every other mod is back on. If the problem needs two mods together, this can be wrong."
             else "No single mod could be blamed. Your mods are back to how they were."
         }
@@ -839,6 +939,8 @@ private fun parsePluginHeader(name: String, s: InputStream): PluginInfo? {
     val h = s.readUpTo(24)
     if (h.size < 24 || String(h, 0, 4, Charsets.ISO_8859_1) != "TES4") return null
     val size = u32(h, 4); val flags = u32(h, 8)
+    val formVersion = (h[20].toInt() and 0xFF) or ((h[21].toInt() and 0xFF) shl 8)
+    var hedr = 0f
     if (size < 0 || size > 4_000_000) return null
     val d = s.readUpTo(size)
     val masters = mutableListOf<String>()
@@ -848,8 +950,34 @@ private fun parsePluginHeader(name: String, s: InputStream): PluginInfo? {
         val len = (d[p + 4].toInt() and 0xFF) or ((d[p + 5].toInt() and 0xFF) shl 8)
         p += 6
         if (p + len > d.size) break
+        if (type == "HEDR" && len >= 4) hedr = java.lang.Float.intBitsToFloat(u32(d, p))
         if (type == "MAST") { var e = p; while (e < p + len && d[e] != 0.toByte()) e++; masters += String(d, p, e - p, Charsets.ISO_8859_1) }
         p += len
     }
-    return PluginInfo(name, (flags and 1) != 0, masters)
+    return PluginInfo(name, (flags and 1) != 0, masters, hedr, formVersion, (flags and 0x200) != 0)
+}
+
+private fun u32le(b: ByteArray, o: Int) = (b[o].toInt() and 0xFF) or ((b[o + 1].toInt() and 0xFF) shl 8) or
+        ((b[o + 2].toInt() and 0xFF) shl 16) or ((b[o + 3].toInt() and 0xFF) shl 24)
+
+/** The CPU type in a Windows DLL's PE header: 0x8664 = 64-bit, 0x014C = 32-bit. */
+private fun peMachine(b: ByteArray): Int? {
+    if (b.size < 0x40 || b[0] != 'M'.code.toByte() || b[1] != 'Z'.code.toByte()) return null
+    val pe = u32le(b, 0x3C)
+    if (pe < 0 || pe + 6 > b.size || b[pe] != 'P'.code.toByte() || b[pe + 1] != 'E'.code.toByte()) return null
+    return (b[pe + 4].toInt() and 0xFF) or ((b[pe + 5].toInt() and 0xFF) shl 8)
+}
+
+/** The "BS version" in a .nif header: 83 for Skyrim LE, 100 for Special Edition. */
+private fun nifBsVersion(b: ByteArray): Int? {
+    if (String(b, 0, minOf(b.size, 20), Charsets.ISO_8859_1) != "Gamebryo File Format") return null
+    val nl = b.indexOf(0x0A.toByte())
+    if (nl < 0 || nl + 18 > b.size) return null
+    return u32le(b, nl + 1 + 13) // after version (4), endian (1), user version (4), block count (4)
+}
+
+/** The DXGI format of a DDS texture with a DX10 header (98 and 99 are BC7), or null for older-style DDS files. */
+private fun ddsDxgi(b: ByteArray): Int? {
+    if (b.size < 132 || String(b, 0, 4, Charsets.ISO_8859_1) != "DDS " || String(b, 84, 4, Charsets.ISO_8859_1) != "DX10") return null
+    return u32le(b, 128)
 }
