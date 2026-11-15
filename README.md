@@ -5,7 +5,7 @@
 Skyrim Mod Manager installs mods straight from archives into your Skyrim `Data` folder and tracks every file each mod adds. That lets it uninstall a mod completely later: plugins, textures, meshes, scripts, and anything else it added. It also manages your plugin list and load order through `Plugins.txt` and `loadorder.txt`.
 
 > [!WARNING]
-> This is beta software that writes to your game folder. Back up your Skyrim folder before installing mods, and back up `Plugins.txt` and `loadorder.txt` before saving a load order for the first time. The app also updates those files when you accept the plugin activation prompt, or when you enable, disable, or uninstall a mod, and saves a backup first.
+> This app writes to your game folder. Back up your Skyrim folder before installing mods, and back up `Plugins.txt` and `loadorder.txt` before saving a load order for the first time. The app also updates those files when you accept the plugin activation prompt, or when you enable, disable, or uninstall a mod, and saves a backup first.
 
 ## Current support
 
@@ -27,12 +27,12 @@ Current capabilities include:
 - a dependency check that reads plugin headers, flags missing, inactive, or misordered masters, and can fix the order;
 - search, sorting, renaming, versions, notes, and source links for installed mods;
 - restoring an earlier load order from the saved backups;
-- profiles that switch whole sets of mods and load orders, plus sharing a setup as text;
+- profiles that keep separate sets of enabled mods and load orders: the active profile is shown on the main screen, every change you make is saved into it, new profiles can start with every mod off, and a setup can be shared as text;
 - verification that every file of every mod is still present and unchanged;
 - a free-space check before installing;
 - a Skyrim.ini helper that turns on loose file loading;
 - a troubleshooting helper that switches mods off in steps to find the one causing a crash;
-- a warning before installing a mod that appears to need SKSE; and
+- a warning before installing a mod that appears to need SKSE, and one for mods that look like Special Edition content (plugin headers, the ESL flag, BSA version, 64-bit SKSE plugins, SE meshes, and BC7 textures); and
 - a progress window during installs, uninstalls, and mod toggles.
 
 Archive support depends on the actual archive format. Zips using LZMA, Deflate64, or BZip2 compression are supported. RAR support covers RAR4 only. Password-protected, multi-part, and RAR5 archives are rejected with an error message.
@@ -79,6 +79,7 @@ Every build is signed with the same key, so a new APK installs over the old one 
 - FOMOD conditions that check for files outside `Data` (such as `skse_loader.exe`) see those files as missing.
 - If two mods overwrite the same file, uninstall or disable them in reverse order of installation.
 - Load order is edited manually. There is no automatic sorting.
+- The Special Edition warning is a best guess. A mod that converted its plugin but still ships SE meshes or textures may be flagged, and some SE mods give no sign at all.
 - The dependency check reads plugin headers only. It does not sort the whole load order the way LOOT does.
 - Conflicts are decided by install order: the mod installed last wins a shared file. Mods installed before conflict tracking existed get an estimated install time.
 - An updated mod counts as the newest mod for conflict purposes.
@@ -89,7 +90,7 @@ Every build is signed with the same key, so a new APK installs over the old one 
 
 ## Building
 
-The project builds with GitHub Actions. Before the first run, add two repository secrets, `KEYSTORE_BASE64` and `KEYSTORE_PASSWORD`, which hold the app's signing key. The key is never stored in the repository. Run the **Build Skyrim Mod Manager APK** workflow from the **Actions** tab, or push a commit. Each successful run publishes a signed APK as a pre-release named after its version (for example `v1.2.5-beta`), with the release notes filled in.
+The project builds with GitHub Actions. Before the first run, add two repository secrets, `KEYSTORE_BASE64` and `KEYSTORE_PASSWORD`, which hold the app's signing key. The key is never stored in the repository. Run the **Build Skyrim Mod Manager APK** workflow from the **Actions** tab, or push a commit. Each successful run attaches a signed APK to the run as a downloadable artifact named after its version (for example `SkyrimModManager-v1.4.5.apk`). Releases are created by hand from the Releases page.
 
 The source files in this repository are written by the workflow on every run, from the copy kept inside `.github/workflows/build.yml`. To change the app, edit that file. Changes made directly to the other files are overwritten by the next run.
 
