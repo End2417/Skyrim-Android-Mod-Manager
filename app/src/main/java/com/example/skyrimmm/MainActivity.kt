@@ -30,7 +30,10 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
@@ -40,6 +43,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -447,7 +453,7 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
         },
         snackbarHost = { SnackbarHost(snack) }
     ) { pad ->
-        Column(Modifier.padding(pad).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(pad).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Dashboard(dataUri, port, mods, busy, onFolder = { pickDir.launch(null) }, onInstall = {
                 updateOf = null
                 pickZip.launch(ARCHIVE_TYPES)
@@ -499,36 +505,36 @@ fun ProgressDialog(p: Prog) {
 @Composable
 fun Dashboard(dataUri: Uri?, port: Boolean?, mods: List<Mod>, busy: Boolean, onFolder: () -> Unit, onInstall: () -> Unit,
               profile: String? = null, onProfile: () -> Unit = {}) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (dataUri == null) {
-                Text("Choose your Skyrim game folder (the one that contains Data) to get started.")
+                Text("Choose your Skyrim game folder (the one that contains Data) to get started.", style = MaterialTheme.typography.bodyMedium)
             } else {
-                Text(dataUri.lastPathSegment?.substringAfterLast(':') ?: "Game folder",
-                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Surface(modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onProfile() }, shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer) {
-                    Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Person, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                        Text("Profile: ${profile ?: "none"}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        Text("  ▾", style = MaterialTheme.typography.labelLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(dataUri.lastPathSegment?.substringAfterLast(':') ?: "Game folder", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    Surface(modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onProfile() }, shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Person, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp))
+                            Text("Profile: ${profile ?: "none"}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text(" ▾", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatChip("${mods.size} mods")
-                    StatChip("${mods.sumOf { it.plugins.size }} plugins")
-                    StatChip(if (port == true) "Port synced" else "No port folder")
-                }
+                StatChip("${mods.size} mods · ${mods.sumOf { it.plugins.size }} plugins · " + if (port == true) "port synced" else "no port folder")
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalButton(onClick = onFolder) {
-                    Icon(Icons.Default.Settings, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
+                FilledTonalButton(onClick = onFolder, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp), modifier = Modifier.height(40.dp)) {
+                    Icon(Icons.Default.Settings, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp))
                     Text(if (dataUri == null) "Choose folder" else "Change")
                 }
-                Button(onClick = onInstall, enabled = dataUri != null && !busy, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
+                Button(onClick = onInstall, enabled = dataUri != null && !busy, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                    modifier = Modifier.weight(1f).height(40.dp)) {
+                    Icon(Icons.Default.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp))
                     Text("Install mod")
                 }
             }
@@ -540,7 +546,7 @@ fun Dashboard(dataUri: Uri?, port: Boolean?, mods: List<Mod>, busy: Boolean, onF
 fun StatChip(text: String) {
     Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer) {
-        Text(text, Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium)
+        Text(text, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
     }
 }
 
@@ -548,17 +554,33 @@ private val ARCHIVE_TYPES = arrayOf("application/zip", "application/x-zip-compre
     "application/vnd.rar", "application/x-rar-compressed", "application/x-rar", "application/octet-stream", "*/*")
 
 @Composable
+fun CompactSearch(value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    Surface(modifier.height(40.dp), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Search, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
+            Spacer(Modifier.width(8.dp))
+            Box(Modifier.weight(1f)) {
+                if (value.isEmpty()) Text("Search mods", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                BasicTextField(value, onChange, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary))
+            }
+            if (value.isNotEmpty()) Icon(Icons.Default.Close, "Clear", Modifier.size(18.dp).clickable { onChange("") }, tint = MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+@Composable
 fun ModList(mods: List<Mod>, allCount: Int, query: String, onQuery: (String) -> Unit, sort: Int, onSort: (Int) -> Unit,
             actionsEnabled: Boolean, conflicts: Map<String, List<Conflict>>, onToggle: (Mod, Boolean) -> Unit,
             onUninstall: (Mod) -> Unit, onShowFiles: (Mod) -> Unit, onUpdate: (Mod) -> Unit, onConflicts: (Mod) -> Unit, onEdit: (Mod) -> Unit, profileName: String? = null) {
     if (allCount > 0) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(value = query, onValueChange = onQuery, modifier = Modifier.weight(1f), singleLine = true,
-                placeholder = { Text("Search mods") }, shape = RoundedCornerShape(24.dp))
+            CompactSearch(query, onQuery, Modifier.weight(1f))
             var open by remember { mutableStateOf(false) }
             val labels = listOf("A–Z", "Newest", "Largest")
             Box {
-                TextButton(onClick = { open = true }) { Text(labels[sort]) }
+                TextButton(onClick = { open = true }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text(labels[sort], style = MaterialTheme.typography.labelLarge) }
                 DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                     labels.forEachIndexed { i, l -> DropdownMenuItem(text = { Text(l) }, onClick = { onSort(i); open = false }) }
                 }
@@ -576,41 +598,42 @@ fun ModList(mods: List<Mod>, allCount: Int, query: String, onQuery: (String) -> 
         }
         return
     }
-    Text("Installed mods" + (profileName?.let { " · profile: $it" } ?: ""), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text("Installed mods" + (profileName?.let { " · profile: $it" } ?: ""), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         items(mods, key = { it.id }) { m ->
             val cs = conflicts[m.id].orEmpty()
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+            var menu by remember { mutableStateOf(false) }
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = if (m.enabled) MaterialTheme.colorScheme.surfaceContainer
                 else MaterialTheme.colorScheme.surfaceContainerLowest)) {
-                Column(Modifier.padding(12.dp).alpha(if (m.enabled) 1f else 0.6f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer).clickable { onShowFiles(m) },
-                            contentAlignment = Alignment.Center) {
-                            Text(m.name.firstOrNull()?.uppercase() ?: "?", color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(m.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${m.files.size} files" + (if (m.size >= 0) " · ${fmtSize(m.size)}" else "") +
-                                    (if (m.plugins.isNotEmpty()) " · " + m.plugins.joinToString { it.substringAfterLast('/') } else "") +
-                                    (if (m.enabled) "" else " · disabled"), style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            if (m.note.isNotBlank()) Text(m.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                        Switch(checked = m.enabled, enabled = actionsEnabled, onCheckedChange = { onToggle(m, it) })
+                Row(Modifier.padding(start = 10.dp, top = 8.dp, bottom = 8.dp, end = 2.dp).alpha(if (m.enabled) 1f else 0.6f),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer).clickable { onShowFiles(m) },
+                        contentAlignment = Alignment.Center) {
+                        Text(m.name.firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
                     }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        if (cs.isNotEmpty()) TextButton(onClick = { onConflicts(m) }) {
-                            Icon(Icons.Default.Warning, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp))
-                            Text("${cs.map { it.path }.distinct().size} overlaps", style = MaterialTheme.typography.labelMedium)
-                        }
-                        Spacer(Modifier.weight(1f))
-                        IconButton(onClick = { onEdit(m) }) { Icon(Icons.Default.Edit, "Edit details") }
-                        IconButton(onClick = { onUpdate(m) }, enabled = actionsEnabled) {
-                            Icon(Icons.Default.Refresh, "Update mod", tint = MaterialTheme.colorScheme.primary)
-                        }
-                        IconButton(onClick = { onUninstall(m) }, enabled = actionsEnabled) {
-                            Icon(Icons.Default.Delete, "Uninstall", tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(m.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text((if (m.version.isNotBlank()) "v${m.version.removePrefix("v")} · " else "") + "${m.files.size} files" +
+                                (if (m.size >= 0) " · ${fmtSize(m.size)}" else "") +
+                                (if (m.plugins.isNotEmpty()) " · " + m.plugins.joinToString { it.substringAfterLast('/') } else "") +
+                                (if (m.enabled) "" else " · disabled"),
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (m.note.isNotBlank()) Text(m.note, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (cs.isNotEmpty()) Text("⚠ ${cs.map { it.path }.distinct().size} overlaps with other mods", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.clickable { onConflicts(m) }.padding(top = 2.dp))
+                    }
+                    Switch(checked = m.enabled, enabled = actionsEnabled, onCheckedChange = { onToggle(m, it) }, modifier = Modifier.scale(0.8f))
+                    Box {
+                        IconButton(onClick = { menu = true }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.MoreVert, "More") }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = { Text("Edit details") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { menu = false; onEdit(m) })
+                            DropdownMenuItem(text = { Text("Update") }, enabled = actionsEnabled, leadingIcon = { Icon(Icons.Default.Refresh, null) },
+                                onClick = { menu = false; onUpdate(m) })
+                            DropdownMenuItem(text = { Text("Uninstall", color = MaterialTheme.colorScheme.error) }, enabled = actionsEnabled,
+                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onUninstall(m) })
                         }
                     }
                 }
@@ -772,26 +795,22 @@ fun LoadOrderScreen(mgr: ModManager, mods: List<Mod>, dataUri: Uri?, manual: Uri
     if (!ready) {
         Text("Choose the game folder that contains the port folder, or select your plugins.txt manually, to manage plugins and their load order.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
-    } else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    } else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         itemsIndexed(list, key = { _, e -> e.name.lowercase() }) { i, e ->
             val bad = issues.any { it.plugin.equals(e.name, true) }
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(
+            Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(
                 containerColor = if (e.active) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest)) {
-                ListItem(
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    leadingContent = { Checkbox(e.active, { list[i] = e.copy(active = it); dirty = true }) },
-                    headlineContent = { Text(e.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    supportingContent = {
+                Row(Modifier.padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(e.active, { list[i] = e.copy(active = it); dirty = true })
+                    Column(Modifier.weight(1f)) {
+                        Text(e.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("#${i + 1}" + (if (scan.info[e.name.lowercase()]?.isMaster ?: e.name.endsWith(".esm", true)) " · master" else "") +
                                 (if (bad) " · ⚠ dependency problem" else ""),
-                            color = if (bad) MaterialTheme.colorScheme.error else Color.Unspecified)
-                    },
-                    trailingContent = {
-                        Row {
-                            IconButton(enabled = i > 0, onClick = { move(i, i - 1) }) { Icon(Icons.Default.KeyboardArrowUp, "Move up") }
-                            IconButton(enabled = i < list.lastIndex, onClick = { move(i, i + 1) }) { Icon(Icons.Default.KeyboardArrowDown, "Move down") }
-                        }
-                    })
+                            style = MaterialTheme.typography.labelSmall, color = if (bad) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(enabled = i > 0, onClick = { move(i, i - 1) }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.KeyboardArrowUp, "Move up") }
+                    IconButton(enabled = i < list.lastIndex, onClick = { move(i, i + 1) }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.KeyboardArrowDown, "Move down") }
+                }
             }
         }
     }
