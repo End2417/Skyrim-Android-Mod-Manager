@@ -32,1516 +32,718 @@ jobs:
       - name: Extract project files
         run: |
           set -e
-          mkdir -p app
-          mkdir -p app/src/main
-          mkdir -p app/src/main/java/com/example/skyrimmm
-          mkdir -p app/src/main/res/drawable
-          mkdir -p app/src/main/res/mipmap-anydpi-v26
-          mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/values-night
-          cat > .gitignore <<'SKYEOF'
-          .gradle/
-          build/
-          local.properties
-          .idea/
-          *.iml
-          *.apk
-          *.keystore
-          *.jks
-          SKYEOF
-          cat > app/build.gradle.kts <<'SKYEOF'
-          plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
-
-          // The workflow passes -PversionCode=<n> so every build has a higher version than the last.
-          val code = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-          android {
-              namespace = "com.example.skyrimmm"
-              compileSdk = 34
-              defaultConfig { applicationId = "com.example.skyrimmm"; minSdk = 26; targetSdk = 34; versionCode = code; versionName = (project.findProperty("versionName") as String?) ?: "1.2.0" }
-              // One fixed key for every build, so a new APK installs over the previous one instead of conflicting with it.
-              signingConfigs {
-                  create("fixed") {
-                      storeFile = file("skyrimmm.keystore"); storeType = "pkcs12"
-                      // The keystore file and its password come from repository secrets at build time (see the workflow).
-                      storePassword = System.getenv("KEYSTORE_PASSWORD"); keyAlias = "skyrimmm"; keyPassword = System.getenv("KEYSTORE_PASSWORD")
-                  }
-              }
-              buildTypes {
-                  getByName("release") { isMinifyEnabled = false; signingConfig = signingConfigs.getByName("fixed") }
-                  getByName("debug") { signingConfig = signingConfigs.getByName("fixed") }
-              }
-              lint { checkReleaseBuilds = false; abortOnError = false }
-              buildFeatures { compose = true }
-              composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
-              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-              kotlinOptions { jvmTarget = "17" }
-              packaging { resources.excludes += listOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/INDEX.LIST", "META-INF/versions/**") }
-          }
-          dependencies {
-              implementation(platform("androidx.compose:compose-bom:2024.06.00"))
-              implementation("androidx.compose.material3:material3")
-              implementation("androidx.compose.material:material-icons-core")
-              implementation("androidx.compose.ui:ui")
-              implementation("androidx.activity:activity-compose:1.9.0")
-              implementation("androidx.documentfile:documentfile:1.0.1")
-              implementation("org.apache.commons:commons-compress:1.26.2")
-              implementation("org.tukaani:xz:1.9")
-              implementation("com.github.junrar:junrar:7.5.5")
-          }
-          SKYEOF
-          cat > app/src/main/AndroidManifest.xml <<'SKYEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-              <application android:largeHeap="true" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="Skyrim LE Mod Manager" android:theme="@style/Theme.SkyrimMM">
-                  <activity android:name=".MainActivity" android:exported="true">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          SKYEOF
-          cat > app/src/main/java/com/example/skyrimmm/Archives.kt <<'SKYEOF'
-          package com.example.skyrimmm
-
-          import android.content.Context
-          import android.net.Uri
-          import androidx.documentfile.provider.DocumentFile
-          import com.github.junrar.Junrar
-          import org.apache.commons.compress.archivers.sevenz.SevenZFile
-          import java.io.Closeable
-          import java.io.File
-          import java.io.InputStream
-          import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
-          import org.apache.commons.compress.archivers.zip.ZipFile
-          import org.tukaani.xz.LZMAInputStream
-          import java.io.DataInputStream
-
-          /** A readable mod archive. forEach visits file entries in order; return false from the callback to stop early. */
-          interface Arch : Closeable {
-              fun names(): List<String>
-              fun forEach(block: (name: String, stream: InputStream) -> Boolean)
-          }
-
-          /** Keeps one staged copy of a 7z/RAR archive on disk so it is copied (and RAR extracted) only once per install. */
-          object Stage {
-              private var key: Uri? = null
-              fun dir(ctx: Context, uri: Uri): File {
-                  val d = File(ctx.cacheDir, "staged")
-                  if (key != uri || !File(d, "a.bin").exists()) {
-                      clear(ctx); d.mkdirs()
-                      val total = DocumentFile.fromSingleUri(ctx, uri)?.length() ?: 0L
-                      ctx.contentResolver.openInputStream(uri)!!.use { i -> File(d, "a.bin").outputStream().use { o ->
-                          val buf = ByteArray(1 shl 16); var done = 0L
-                          while (true) {
-                              val n = i.read(buf); if (n < 0) break
-                              o.write(buf, 0, n); done += n
-                              Progress.report("Reading archive", "Copying archive… ${done shr 20} MB" + (if (total > 0) " of ${total shr 20} MB" else ""),
-                                  if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else null)
-                          }
-                      } }
-                      key = uri
-                  }
-                  return d
-              }
-              fun clear(ctx: Context) { File(ctx.cacheDir, "staged").deleteRecursively(); key = null }
-          }
-
-          fun openArchive(ctx: Context, uri: Uri): Arch {
-              val head = ByteArray(8)
-              ctx.contentResolver.openInputStream(uri)!!.use { it.read(head) }
-              fun starts(vararg b: Int) = b.indices.all { head[it] == b[it].toByte() }
-              return when {
-                  starts(0x50, 0x4B) -> ZipArch(ctx, uri)
-                  starts(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C) -> SevenArch(ctx, uri)
-                  starts(0x52, 0x61, 0x72, 0x21, 0x1A, 0x07) -> RarArch(ctx, uri)
-                  else -> error("Unsupported archive format (supported: zip, 7z, rar)")
-              }
-          }
-
-          /** Reads zips with commons-compress, which (unlike java.util.zip) handles Deflate64 and BZip2; LZMA entries (method 14) are decoded here. */
-          private class ZipArch(ctx: Context, uri: Uri) : Arch {
-              private val zip = ZipFile(File(Stage.dir(ctx, uri), "a.bin"))
-              private fun files() = zip.entriesInPhysicalOrder.asSequence().filter { !it.isDirectory }
-              override fun names() = files().map { it.name }.toList()
-
-              private fun open(e: ZipArchiveEntry): InputStream = when {
-                  e.generalPurposeBit.usesEncryption() -> error("Password-protected archives are not supported (${e.name}).")
-                  zip.canReadEntryData(e) -> zip.getInputStream(e)
-                  e.method == 14 -> lzmaZipStream(zip.getRawInputStream(e), e.size)
-                  else -> error("Unsupported zip compression method ${e.method} (${e.name}). Re-pack the mod as a normal zip or a 7z.")
-              }
-
-              override fun forEach(block: (String, InputStream) -> Boolean) {
-                  for (e in files()) open(e).use { if (!block(e.name, it)) return }
-              }
-              override fun close() = zip.close()
-          }
-
-          /** Zip's LZMA entries: 2 bytes version, 2 bytes properties size, 5 bytes properties, then the raw LZMA data. */
-          private fun lzmaZipStream(raw: InputStream, size: Long): InputStream {
-              val h = ByteArray(9)
-              DataInputStream(raw).readFully(h)
-              val dict = (h[5].toInt() and 0xFF) or ((h[6].toInt() and 0xFF) shl 8) or ((h[7].toInt() and 0xFF) shl 16) or ((h[8].toInt() and 0xFF) shl 24)
-              return LZMAInputStream(raw, size, h[4], dict)
-          }
-
-          private class SevenArch(ctx: Context, uri: Uri) : Arch {
-              private val sz = SevenZFile(File(Stage.dir(ctx, uri), "a.bin"))
-              override fun names() = sz.entries.filter { !it.isDirectory }.map { it.name }
-              override fun forEach(block: (String, InputStream) -> Boolean) {
-                  for (e in sz.entries) { if (e.isDirectory) continue; if (!block(e.name, sz.getInputStream(e))) break }
-              }
-              override fun close() = sz.close()
-          }
-
-          /** RAR4 only (and not encrypted or multi-part): extracted once into the staging folder, then read from there. */
-          private class RarArch(ctx: Context, uri: Uri) : Arch {
-              private val dir = File(Stage.dir(ctx, uri), "rar").also { d ->
-                  if (!d.exists()) {
-                      d.mkdirs()
-                      try { Junrar.extract(File(d.parentFile, "a.bin"), d) }
-                      catch (t: Throwable) {
-                          d.deleteRecursively()
-                          throw IllegalStateException("Cannot extract RAR (RAR5, encrypted and multi-part archives are not supported): ${t.message}")
-                      }
-                  }
-              }
-              private fun rel() = dir.walkTopDown().filter { it.isFile }.map { it.relativeTo(dir).path.replace('\\', '/') }.toList()
-              override fun names() = rel()
-              override fun forEach(block: (String, InputStream) -> Boolean) {
-                  for (n in rel()) File(dir, n).inputStream().use { if (!block(n, it)) return }
-              }
-              override fun close() {}
-          }
-
-          /** Lets long operations report what they are doing; the UI shows it in a progress dialog. */
-          object Progress {
-              @Volatile var sink: ((String, String, Float?) -> Unit)? = null
-              private var last = 0L
-              fun report(title: String, detail: String, fraction: Float? = null, force: Boolean = false) {
-                  val now = System.currentTimeMillis()
-                  if (!force && now - last < 80) return // don't flood the UI with thousands of updates
-                  last = now
-                  sink?.invoke(title, detail, fraction)
-              }
-          }
-          SKYEOF
-          cat > app/src/main/java/com/example/skyrimmm/Fomod.kt <<'SKYEOF'
-          package com.example.skyrimmm
-
-          import android.graphics.Bitmap
-          import androidx.compose.runtime.getValue
-          import androidx.compose.runtime.mutableStateMapOf
-          import androidx.compose.runtime.mutableStateOf
-          import androidx.compose.runtime.setValue
-          import org.w3c.dom.Element
-          import javax.xml.parsers.DocumentBuilderFactory
-
-          data class FFile(val src: String, val dst: String, val folder: Boolean, val priority: Int)
-
-          const val GAME_VERSION = "1.9.32.0" // Skyrim Legendary Edition final patch
-
-          fun verAtLeast(have: String, need: String): Boolean {
-              val a = have.split('.').map { it.toIntOrNull() ?: 0 }; val b = need.split('.').map { it.toIntOrNull() ?: 0 }
-              for (i in 0 until maxOf(a.size, b.size)) { val x = a.getOrElse(i) { 0 }; val y = b.getOrElse(i) { 0 }; if (x != y) return x > y }
-              return true
-          }
-
-          fun normPath(p: String) = p.replace('\\', '/').split('/').filter { it.isNotEmpty() }.joinToString("/").lowercase()
-
-          class Cond(val op: String, val flags: List<Pair<String, String>>, val files: List<Pair<String, String>>,
-                     val game: List<String>, val kids: List<Cond>) {
-              fun collect(out: MutableSet<String>) { files.forEach { out += it.first }; kids.forEach { it.collect(out) } }
-              fun eval(set: Map<String, String>, has: (String) -> Boolean): Boolean {
-                  val r = flags.map { (k, v) -> set[k] == v } +
-                          files.map { (f, s) -> has(f) == s.equals("Active", true) } +
-                          game.map { verAtLeast(GAME_VERSION, it) } +
-                          kids.map { it.eval(set, has) }
-                  return if (op.equals("Or", true)) r.any { it } else r.all { it }
-              }
-          }
-
-          class FPlugin(val name: String, val desc: String, val defType: String, val patterns: List<Pair<Cond, String>>,
-                        val files: List<FFile>, val setFlags: Map<String, String>, val image: String) {
-              fun type(flags: Map<String, String>, has: (String) -> Boolean) =
-                  patterns.firstOrNull { it.first.eval(flags, has) }?.second ?: defType
-          }
-          class FGroup(val name: String, val type: String, val plugins: List<FPlugin>)
-          class FStep(val name: String, val visible: Cond?, val groups: List<FGroup>)
-          class FomodConfig(val required: List<FFile>, val steps: List<FStep>, val conditional: List<Pair<Cond, List<FFile>>>)
-          class FomodPack(val config: FomodConfig, val prefix: String, val names: List<String>)
-
-          private fun Element.kids(n: String) = (0 until childNodes.length).mapNotNull { childNodes.item(it) as? Element }.filter { it.tagName.equals(n, true) }
-          private fun Element.kid(n: String) = kids(n).firstOrNull()
-
-          private fun files(e: Element?): List<FFile> = e?.let { el ->
-              (el.kids("file").map { false to it } + el.kids("folder").map { true to it }).map { (fo, x) ->
-                  FFile(x.getAttribute("source"), x.getAttribute("destination"), fo, x.getAttribute("priority").toIntOrNull() ?: 0)
-              }
-          }.orEmpty()
-
-          private fun cond(e: Element?): Cond? = e?.let { el ->
-              Cond(el.getAttribute("operator").ifEmpty { "And" },
-                  el.kids("flagDependency").map { it.getAttribute("flag") to it.getAttribute("value") },
-                  el.kids("fileDependency").map { it.getAttribute("file") to it.getAttribute("state") },
-                  el.kids("gameDependency").map { it.getAttribute("version") },
-                  el.kids("dependencies").mapNotNull { cond(it) })
-          }
-
-          private fun <T> List<T>.ordered(order: String?, name: (T) -> String) = when (order?.lowercase()) {
-              "ascending" -> sortedBy { name(it).lowercase() }
-              "descending" -> sortedByDescending { name(it).lowercase() }
-              else -> this
-          }
-
-          fun parseFomod(xml: ByteArray): FomodConfig {
-              val r = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.inputStream()).documentElement
-              fun plugin(p: Element): FPlugin {
-                  val td = p.kid("typeDescriptor"); val dt = td?.kid("dependencyType")
-                  return FPlugin(p.getAttribute("name"), p.kid("description")?.textContent?.trim().orEmpty(),
-                      dt?.kid("defaultType")?.getAttribute("name") ?: td?.kid("type")?.getAttribute("name") ?: "Optional",
-                      dt?.kid("patterns")?.kids("pattern").orEmpty().mapNotNull { pt ->
-                          cond(pt.kid("dependencies"))?.let { it to (pt.kid("type")?.getAttribute("name") ?: "Optional") } },
-                      files(p.kid("files")),
-                      p.kid("conditionFlags")?.kids("flag").orEmpty().associate { it.getAttribute("name") to it.textContent.trim() },
-                      p.kid("image")?.getAttribute("path").orEmpty())
-              }
-              fun group(g: Element) = FGroup(g.getAttribute("name"), g.getAttribute("type"),
-                  g.kid("plugins")?.let { ps -> ps.kids("plugin").map { plugin(it) }.ordered(ps.getAttribute("order")) { it.name } }.orEmpty())
-              fun step(s: Element) = FStep(s.getAttribute("name"), cond(s.kid("visible")),
-                  s.kid("optionalFileGroups")?.let { gs -> gs.kids("group").map { group(it) }.ordered(gs.getAttribute("order")) { it.name } }.orEmpty())
-              val steps = r.kid("installSteps")?.let { ss -> ss.kids("installStep").map { step(it) }.ordered(ss.getAttribute("order")) { it.name } }.orEmpty()
-              val conditional = r.kid("conditionalFileInstalls")?.kid("patterns")?.kids("pattern").orEmpty().mapNotNull { pt ->
-                  cond(pt.kid("dependencies"))?.let { it to files(pt.kid("files")) } }
-              return FomodConfig(files(r.kid("requiredInstallFiles")), steps, conditional)
-          }
-
-          /** Drives the installer pages: visibility, defaults, selection rules and the final file list. */
-          class FomodWizard(val cfg: FomodConfig, val has: (String) -> Boolean, val images: Map<String, Bitmap> = emptyMap()) {
-              val picked = mutableStateMapOf<Triple<Int, Int, Int>, Boolean>()
-              var cur by mutableStateOf(0)
-              val done get() = cur >= cfg.steps.size
-
-              init { cur = nextVisible(-1); if (!done) enter() }
-
-              private fun walk(upTo: Int): Pair<Map<String, String>, List<FPlugin>> {
-                  val flags = mutableMapOf<String, String>(); val chosen = mutableListOf<FPlugin>()
-                  for ((i, s) in cfg.steps.withIndex()) {
-                      if (i >= upTo) break
-                      if (s.visible?.eval(flags, has) == false) continue
-                      s.groups.forEachIndexed { gi, g -> g.plugins.forEachIndexed { pi, p ->
-                          if (picked[Triple(i, gi, pi)] == true) { chosen += p; flags.putAll(p.setFlags) } } }
-                  }
-                  return flags to chosen
-              }
-              fun flagsAt(step: Int) = walk(step).first
-              private fun visible(i: Int) = cfg.steps[i].visible?.eval(flagsAt(i), has) != false
-              private fun nextVisible(from: Int): Int { for (i in from + 1 until cfg.steps.size) if (visible(i)) return i; return cfg.steps.size }
-              private fun prevVisible(from: Int): Int { for (i in from - 1 downTo 0) if (visible(i)) return i; return -1 }
-              fun hasNext() = nextVisible(cur) < cfg.steps.size
-              fun hasPrev() = prevVisible(cur) >= 0
-              fun next() { cur = nextVisible(cur); if (!done) enter() }
-              fun back() { prevVisible(cur).takeIf { it >= 0 }?.let { cur = it } }
-
-              private fun enter() {
-                  val i = cur; val fl = flagsAt(i)
-                  cfg.steps[i].groups.forEachIndexed { gi, g ->
-                      if (g.plugins.indices.any { picked.containsKey(Triple(i, gi, it)) }) return@forEachIndexed
-                      val types = g.plugins.map { it.type(fl, has) }
-                      var sel = types.map { it == "Required" || it == "Recommended" || g.type == "SelectAll" }
-                      val single = g.type == "SelectExactlyOne" || g.type == "SelectAtMostOne"
-                      if (single) { val f = sel.indexOf(true); sel = sel.indices.map { it == f } }
-                      if (sel.none { it } && (g.type == "SelectExactlyOne" || g.type == "SelectAtLeastOne")) {
-                          val u = types.indexOfFirst { it != "NotUsable" }; sel = sel.indices.map { it == u }
-                      }
-                      sel.forEachIndexed { pi, b -> picked[Triple(i, gi, pi)] = b && types[pi] != "NotUsable" }
-                  }
-              }
-
-              fun toggle(i: Int, gi: Int, pi: Int) {
-                  val g = cfg.steps[i].groups[gi]; val k = Triple(i, gi, pi); val was = picked[k] == true
-                  when (g.type) {
-                      "SelectExactlyOne", "SelectAtMostOne" -> {
-                          g.plugins.indices.forEach { picked[Triple(i, gi, it)] = false }
-                          picked[k] = if (g.type == "SelectAtMostOne") !was else true
-                      }
-                      "SelectAll" -> {}
-                      else -> picked[k] = !was
-                  }
-              }
-
-              /** Explains why the current page can't be advanced yet, or null if its selection rules are met. */
-              fun problem(): String? {
-                  val fl = flagsAt(cur)
-                  return cfg.steps[cur].groups.withIndex().firstNotNullOfOrNull { (gi, g) ->
-                      val n = g.plugins.indices.count { picked[Triple(cur, gi, it)] == true }
-                      val usable = g.plugins.any { it.type(fl, has) != "NotUsable" }
-                      when {
-                          g.type == "SelectExactlyOne" && usable && n != 1 -> "Choose exactly one option in \"${g.name}\""
-                          g.type == "SelectAtLeastOne" && usable && n < 1 -> "Choose at least one option in \"${g.name}\""
-                          g.type == "SelectAtMostOne" && n > 1 -> "Choose at most one option in \"${g.name}\""
-                          else -> null
-                      }
-                  }
-              }
-
-              /** Required files, then chosen options, then conditional installs (later entries win equal-priority ties). */
-              fun result(): List<FFile> {
-                  val (flags, chosen) = walk(cfg.steps.size)
-                  return cfg.required + chosen.flatMap { it.files } +
-                          cfg.conditional.filter { it.first.eval(flags, has) }.flatMap { it.second }
-              }
-          }
-
-          /** Every file path the config's conditions ask about, so they can be looked up once up front. */
-          fun FomodConfig.fileDeps(): Set<String> {
-              val out = mutableSetOf<String>()
-              steps.forEach { s -> s.visible?.collect(out); s.groups.forEach { g -> g.plugins.forEach { p -> p.patterns.forEach { it.first.collect(out) } } } }
-              conditional.forEach { it.first.collect(out) }
-              return out
-          }
-          SKYEOF
-          cat > app/src/main/java/com/example/skyrimmm/MainActivity.kt <<'SKYEOF'
-          package com.example.skyrimmm
-
-          import android.content.Context
-          import android.content.Intent
-          import android.net.Uri
-          import android.os.Build
-          import android.os.Bundle
-          import android.provider.Settings
-          import androidx.activity.ComponentActivity
-          import androidx.activity.compose.rememberLauncherForActivityResult
-          import androidx.activity.compose.setContent
-          import androidx.activity.result.contract.ActivityResultContracts
-          import androidx.compose.foundation.Image
-          import androidx.compose.foundation.background
-          import androidx.compose.foundation.clickable
-          import androidx.compose.foundation.isSystemInDarkTheme
-          import androidx.compose.foundation.layout.*
-          import androidx.compose.foundation.lazy.LazyColumn
-          import androidx.compose.foundation.lazy.items
-          import androidx.compose.foundation.lazy.itemsIndexed
-          import androidx.compose.foundation.shape.CircleShape
-          import androidx.compose.foundation.shape.RoundedCornerShape
-          import androidx.compose.material.icons.Icons
-          import androidx.compose.material.icons.filled.Add
-          import androidx.compose.material.icons.filled.Check
-          import androidx.compose.material.icons.filled.Delete
-          import androidx.compose.material.icons.filled.Home
-          import androidx.compose.material.icons.filled.KeyboardArrowDown
-          import androidx.compose.material.icons.filled.KeyboardArrowUp
-          import androidx.compose.material.icons.filled.List
-          import androidx.compose.material.icons.filled.Settings
-          import androidx.compose.material3.*
-          import androidx.compose.runtime.*
-          import androidx.compose.ui.Alignment
-          import androidx.compose.ui.Modifier
-          import androidx.compose.ui.draw.alpha
-          import androidx.compose.ui.draw.clip
-          import androidx.compose.ui.graphics.Color
-          import androidx.compose.ui.graphics.asImageBitmap
-          import androidx.compose.ui.platform.LocalContext
-          import androidx.compose.ui.text.font.FontWeight
-          import androidx.compose.ui.text.style.TextAlign
-          import androidx.compose.ui.text.style.TextOverflow
-          import androidx.compose.ui.unit.dp
-          import androidx.compose.ui.window.Dialog
-          import androidx.compose.ui.window.DialogProperties
-          import androidx.lifecycle.Lifecycle
-          import androidx.lifecycle.LifecycleEventObserver
-          import kotlinx.coroutines.Dispatchers
-          import kotlinx.coroutines.launch
-          import kotlinx.coroutines.withContext
-
-          class MainActivity : ComponentActivity() {
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  setContent { SkyrimTheme { Surface(Modifier.fillMaxSize()) { App(this) } } }
-              }
-          }
-
-          /** Material You colors on Android 12+, an icy Nordic palette on older versions. */
-          @Composable
-          fun SkyrimTheme(content: @Composable () -> Unit) {
-              val ctx = LocalContext.current
-              val dark = isSystemInDarkTheme()
-              val scheme = when {
-                  Build.VERSION.SDK_INT >= 31 -> if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
-                  dark -> darkColorScheme(primary = Color(0xFF9CCBEA), onPrimary = Color(0xFF00334B), primaryContainer = Color(0xFF1F4A66),
-                      onPrimaryContainer = Color(0xFFCDE6F7), secondaryContainer = Color(0xFF354A57), onSecondaryContainer = Color(0xFFD0E5F4),
-                      background = Color(0xFF10161B), surface = Color(0xFF10161B), onSurface = Color(0xFFE0E6EB))
-                  else -> lightColorScheme(primary = Color(0xFF2C6A8D), primaryContainer = Color(0xFFCDE6F7), onPrimaryContainer = Color(0xFF001E2E),
-                      secondaryContainer = Color(0xFFD0E5F4), onSecondaryContainer = Color(0xFF0B1E2A))
-              }
-              MaterialTheme(colorScheme = scheme, content = content)
-          }
-
-          @OptIn(ExperimentalMaterial3Api::class)
-          @Composable
-          fun App(ctx: Context) {
-              val mgr = remember { ModManager(ctx) }
-              val prefs = remember { ctx.getSharedPreferences("p", 0) }
-              var dataUri by remember { mutableStateOf(prefs.getString("data", null)?.let(Uri::parse)) }
-              var mods by remember { mutableStateOf(mgr.list()) }
-              var status by remember { mutableStateOf("") }
-              var busy by remember { mutableStateOf(false) }
-              var prog by remember { mutableStateOf<Prog?>(null) }
-              DisposableEffect(Unit) {
-                  Progress.sink = { t, d, f -> prog = Prog(t, d, f) }
-                  onDispose { Progress.sink = null }
-              }
-              var wiz by remember { mutableStateOf<Triple<FomodWizard, FomodPack, Uri>?>(null) }
-              var tab by remember { mutableStateOf(0) }
-              var port by remember { mutableStateOf<Boolean?>(null) }
-              var pluginsUri by remember { mutableStateOf(prefs.getString("plugins", null)?.let(Uri::parse)) }
-              var skseZip by remember { mutableStateOf<Pair<Uri, List<String>>?>(null) }
-              var confirm by remember { mutableStateOf<Mod?>(null) }
-              var filesOf by remember { mutableStateOf<Mod?>(null) }
-              var fast by remember { mutableStateOf(mgr.fastAccess()) }
-              DisposableEffect(Unit) {
-                  val act = ctx as ComponentActivity
-                  val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) fast = mgr.fastAccess() }
-                  act.lifecycle.addObserver(obs)
-                  onDispose { act.lifecycle.removeObserver(obs) }
-              }
-              val snack = remember { SnackbarHostState() }
-              val scope = rememberCoroutineScope()
-              val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull().orEmpty() }
-
-              LaunchedEffect(status) { if (status.isNotBlank()) snack.showSnackbar(status) }
-              LaunchedEffect(dataUri, mods.size) { // measure mods installed before sizes were recorded
-                  val d = dataUri ?: return@LaunchedEffect
-                  if (mods.any { it.size < 0 }) {
-                      withContext(Dispatchers.IO) { runCatching { mods.filter { it.size < 0 }.forEach { mgr.measure(d, it) } } }
-                      mods = mgr.list()
-                  }
-              }
-              LaunchedEffect(dataUri) {
-                  port = dataUri?.let { u -> withContext(Dispatchers.IO) { runCatching { mgr.findPortDir(u) != null }.getOrDefault(false) } }
-              }
-
-              fun io(label: String = "Installed", block: () -> Mod) {
-                  busy = true
-                  prog = Prog(when (label) { "Installed" -> "Installing"; "Uninstalled" -> "Uninstalling"; "Enabled" -> "Enabling"; "Disabled" -> "Disabling"; else -> "Working" }, "Starting…", null)
-                  scope.launch {
-                      status = withContext(Dispatchers.IO) {
-                          runCatching { block().let { "$label: ${it.name} (${it.files.size} files, ${it.plugins.size} plugin(s))" } }
-                              .getOrElse { "Error: ${it.message}" }
-                      }
-                      mods = mgr.list(); busy = false; prog = null
-                  }
-              }
-
-              val pickDir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { u ->
-                  if (u != null) {
-                      ctx.contentResolver.takePersistableUriPermission(u,
-                          Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                      scope.launch {
-                          val r = withContext(Dispatchers.IO) { runCatching { mgr.describe(u) } }
-                          r.onSuccess { prefs.edit().putString("data", u.toString()).apply(); dataUri = u; status = it }
-                              .onFailure { status = "Error: ${it.message}" }
-                      }
-                  }
-              }
-              val pickPlugins = rememberLauncherForActivityResult(OpenRW()) { u ->
-                  if (u != null) {
-                      ctx.contentResolver.takePersistableUriPermission(u,
-                          Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                      prefs.edit().putString("plugins", u.toString()).apply(); pluginsUri = u
-                      status = "plugins.txt linked."
-                  }
-              }
-
-              fun begin(u: Uri) {
-                  val d = dataUri ?: return
-                  busy = true
-                  prog = Prog("Reading archive", "Preparing…", null)
-                  scope.launch {
-                      val pack = withContext(Dispatchers.IO) { runCatching { mgr.readFomod(u) }.getOrNull() }
-                      if (pack == null) { busy = false; io { mgr.install(d, u) } }
-                      else {
-                          val (ex, imgs) = withContext(Dispatchers.IO) {
-                              mgr.existing(d, pack.config.fileDeps()) to runCatching { mgr.loadImages(u, pack) }.getOrDefault(emptyMap())
-                          }
-                          val w = FomodWizard(pack.config, { f -> normPath(f) in ex }, imgs)
-                          busy = false; prog = null
-                          if (w.done) io { mgr.installFomod(d, u, pack, w.result()) } else wiz = Triple(w, pack, u)
-                      }
-                  }
-              }
-              val pickZip = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u ->
-                  if (u != null && dataUri != null) {
-                      busy = true
-                      prog = Prog("Reading archive", "Preparing…", null)
-                      scope.launch {
-                          val why = withContext(Dispatchers.IO) { runCatching { mgr.skseReasons(u) }.getOrDefault(emptyList()) }
-                          busy = false
-                          if (why.isNotEmpty()) { prog = null; skseZip = u to why } else begin(u)
-                      }
-                  }
-              }
-
-              skseZip?.let { (u, why) ->
-                  AlertDialog(
-                      onDismissRequest = { skseZip = null },
-                      title = { Text("SKSE mod detected") },
-                      text = {
-                          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                              Text("This mod appears to need SKSE (Skyrim Script Extender). SKSE is not supported by this app, so this mod should not work and may cause crashes or broken scripts. You can still install it and uninstall it completely later.")
-                              Text("Why it was flagged:", style = MaterialTheme.typography.titleSmall)
-                              why.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-                              Text("Detection is a best guess, so it can be wrong in both directions.", style = MaterialTheme.typography.bodySmall,
-                                  color = MaterialTheme.colorScheme.outline)
-                          }
-                      },
-                      confirmButton = { TextButton(onClick = { skseZip = null; begin(u) }) { Text("Install anyway") } },
-                      dismissButton = { TextButton(onClick = { skseZip = null; mgr.clearStage(); status = "Install cancelled." }) { Text("Cancel") } })
-              }
-              wiz?.let { (w, pack, zip) ->
-                  FomodDialog(w, onCancel = { wiz = null; mgr.clearStage(); status = "Install cancelled." }) {
-                      wiz = null; io { mgr.installFomod(dataUri!!, zip, pack, w.result()) }
-                  }
-              }
-              confirm?.let { m ->
-                  var details by remember(m.id) { mutableStateOf(false) }
-                  AlertDialog(
-                      onDismissRequest = { confirm = null },
-                      title = { Text("Uninstall ${m.name}?") },
-                      text = {
-                          Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                              Text("This removes ${m.files.size} files" + (if (m.size >= 0) " (${fmtSize(m.size)})" else "") + " the mod added" +
-                                      if (m.backups.isNotEmpty()) " and restores ${m.backups.size} file(s) it overwrote." else ".")
-                              TextButton(onClick = { details = !details }) { Text(if (details) "Hide details" else "Show details") }
-                              if (details) LazyColumn(Modifier.heightIn(max = 280.dp)) {
-                                  item { Text("Removed (${m.files.size})", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary) }
-                                  items(m.files) { Text(it, style = MaterialTheme.typography.bodySmall) }
-                                  item { Text("Restored to the original (${m.backups.size})", style = MaterialTheme.typography.titleSmall,
-                                      color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
-                                  if (m.backups.isEmpty()) item { Text("Nothing to restore.", style = MaterialTheme.typography.bodySmall) }
-                                  else items(m.backups.keys.toList()) { Text(it, style = MaterialTheme.typography.bodySmall) }
-                                  if (m.dirs.isNotEmpty()) {
-                                      item { Text("Folders removed if left empty (${m.dirs.size})", style = MaterialTheme.typography.titleSmall,
-                                          color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
-                                      items(m.dirs) { Text(it, style = MaterialTheme.typography.bodySmall) }
-                                  }
-                              }
-                          }
-                      },
-                      confirmButton = { TextButton(onClick = { confirm = null; io("Uninstalled") { mgr.uninstall(dataUri!!, m); m } }) { Text("Uninstall") } },
-                      dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel") } })
-              }
-
-              prog?.let { ProgressDialog(it) }
-
-              filesOf?.let { m ->
-                  AlertDialog(
-                      onDismissRequest = { filesOf = null },
-                      title = { Text(m.name) },
-                      text = {
-                          LazyColumn(Modifier.heightIn(max = 360.dp)) {
-                              item { Text("${m.files.size} files" + (if (m.size >= 0) " · ${fmtSize(m.size)}" else ""), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary) }
-                              items(m.files) { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 2.dp)) }
-                              if (m.backups.isNotEmpty()) {
-                                  item { Text("Overwrote ${m.backups.size} existing file(s), restored on uninstall", style = MaterialTheme.typography.titleSmall,
-                                      color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
-                                  items(m.backups.keys.toList()) { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 2.dp)) }
-                              }
-                          }
-                      },
-                      confirmButton = { TextButton(onClick = { filesOf = null }) { Text("Close") } })
-              }
-
-              Scaffold(
-                  topBar = {
-                      TopAppBar(
-                          title = {
-                              Column {
-                                  Text("Skyrim Mod Manager", fontWeight = FontWeight.Bold)
-                                  Text("Legendary Edition" + if (version.isNotEmpty()) " · v$version" else "", style = MaterialTheme.typography.labelSmall)
-                              }
-                          },
-                          colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface))
-                  },
-                  bottomBar = {
-                      NavigationBar {
-                          NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Mods") })
-                          NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Icon(Icons.Default.List, null) }, label = { Text("Load order") })
-                      }
-                  },
-                  snackbarHost = { SnackbarHost(snack) }
-              ) { pad ->
-                  Column(Modifier.padding(pad).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                      Dashboard(dataUri, port, mods, busy, onFolder = { pickDir.launch(null) }, onInstall = {
-                          pickZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/x-7z-compressed",
-                              "application/vnd.rar", "application/x-rar-compressed", "application/x-rar", "application/octet-stream"))
-                      })
-                      if (!fast && dataUri != null && Build.VERSION.SDK_INT >= 30) Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
-                          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-                          Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                              Text("Fast mode is off. Allow All files access so installing and uninstalling work directly on your files.",
-                                  Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                              Spacer(Modifier.width(8.dp))
-                              FilledTonalButton(onClick = {
-                                  ctx.startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}")))
-                              }) { Text("Enable") }
-                          }
-                      }
-                      if (tab == 1) LoadOrderScreen(mgr, mods, dataUri, pluginsUri, { pickPlugins.launch(arrayOf("text/plain", "*/*")) }) { status = it }
-                      else ModList(mods, !busy && dataUri != null,
-                          onToggle = { m, on -> io(if (on) "Enabled" else "Disabled") { mgr.setEnabled(dataUri!!, m, on) } },
-                          onUninstall = { confirm = it }, onShowFiles = { filesOf = it })
-                  }
-              }
-          }
-
-          data class Prog(val title: String, val detail: String, val fraction: Float?)
-
-          /** Blocks the screen while a long operation runs, showing what it is doing and how far along it is. */
-          @Composable
-          fun ProgressDialog(p: Prog) {
-              Dialog(onDismissRequest = {}, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
-                  Surface(shape = RoundedCornerShape(28.dp), tonalElevation = 6.dp) {
-                      Column(Modifier.padding(24.dp).widthIn(min = 280.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                          Text(p.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                          val f = p.fraction
-                          if (f != null) LinearProgressIndicator(progress = { f }, modifier = Modifier.fillMaxWidth())
-                          else LinearProgressIndicator(Modifier.fillMaxWidth())
-                          Row(verticalAlignment = Alignment.Top) {
-                              Text(p.detail, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                              if (f != null) Text("  ${(f * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
-                          }
-                      }
-                  }
-              }
-          }
-
-          @Composable
-          fun Dashboard(dataUri: Uri?, port: Boolean?, mods: List<Mod>, busy: Boolean, onFolder: () -> Unit, onInstall: () -> Unit) {
-              Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
-                  colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer,
-                      contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
-                  Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                      if (dataUri == null) {
-                          Text("Choose your Skyrim game folder (the one that contains Data) to get started.")
-                      } else {
-                          Text(dataUri.lastPathSegment?.substringAfterLast(':') ?: "Game folder",
-                              style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                              StatChip("${mods.size} mods")
-                              StatChip("${mods.sumOf { it.plugins.size }} plugins")
-                              StatChip(if (port == true) "Port synced" else "No port folder")
-                          }
-                      }
-                      Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                          FilledTonalButton(onClick = onFolder) {
-                              Icon(Icons.Default.Settings, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
-                              Text(if (dataUri == null) "Choose folder" else "Change")
-                          }
-                          Button(onClick = onInstall, enabled = dataUri != null && !busy, modifier = Modifier.weight(1f)) {
-                              Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
-                              Text("Install mod")
-                          }
-                      }
-                  }
-              }
-          }
-
-          @Composable
-          fun StatChip(text: String) {
-              Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer,
-                  contentColor = MaterialTheme.colorScheme.onSecondaryContainer) {
-                  Text(text, Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium)
-              }
-          }
-
-          @Composable
-          fun ModList(mods: List<Mod>, actionsEnabled: Boolean, onToggle: (Mod, Boolean) -> Unit, onUninstall: (Mod) -> Unit, onShowFiles: (Mod) -> Unit) {
-              if (mods.isEmpty()) {
-                  Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                      Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                          Icon(Icons.Default.Add, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
-                          Text("No mods yet", style = MaterialTheme.typography.titleMedium)
-                          Text("Install a zip, 7z or rar and it will appear here with an on/off switch and an uninstall button.",
-                              style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.outline)
-                      }
-                  }
-                  return
-              }
-              Text("Installed mods", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-              LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                  items(mods, key = { it.id }) { m ->
-                      Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
-                          colors = CardDefaults.cardColors(containerColor = if (m.enabled) MaterialTheme.colorScheme.surfaceContainer
-                          else MaterialTheme.colorScheme.surfaceContainerLowest)) {
-                          Row(Modifier.padding(12.dp).alpha(if (m.enabled) 1f else 0.6f), verticalAlignment = Alignment.CenterVertically) {
-                              Box(Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer).clickable { onShowFiles(m) }, contentAlignment = Alignment.Center) {
-                                  Text(m.name.firstOrNull()?.uppercase() ?: "?", color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
-                              }
-                              Spacer(Modifier.width(12.dp))
-                              Column(Modifier.weight(1f)) {
-                                  Text(m.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                  Text("${m.files.size} files" + (if (m.size >= 0) " · ${fmtSize(m.size)}" else "") + (if (m.plugins.isNotEmpty()) " · " + m.plugins.joinToString { it.substringAfterLast('/') } else "") +
-                                          (if (m.enabled) "" else " · disabled"), style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                              }
-                              Switch(checked = m.enabled, enabled = actionsEnabled, onCheckedChange = { onToggle(m, it) })
-                              IconButton(onClick = { onUninstall(m) }, enabled = actionsEnabled) {
-                                  Icon(Icons.Default.Delete, "Uninstall", tint = MaterialTheme.colorScheme.error)
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-
-          @Composable
-          fun FomodDialog(w: FomodWizard, onCancel: () -> Unit, onFinish: () -> Unit) {
-              val i = w.cur; val step = w.cfg.steps[i]; val flags = w.flagsAt(i)
-              Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-                  Surface(Modifier.fillMaxWidth(0.95f).fillMaxHeight(0.85f), shape = MaterialTheme.shapes.large) {
-                      Column(Modifier.padding(16.dp)) {
-                          Text(step.name, style = MaterialTheme.typography.titleLarge)
-                          LazyColumn(Modifier.weight(1f)) {
-                              step.groups.forEachIndexed { gi, g ->
-                                  item { Text("${g.name} (${g.type.removePrefix("Select")})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp)) }
-                                  itemsIndexed(g.plugins) { pi, p ->
-                                      val t = p.type(flags, w.has); val sel = w.picked[Triple(i, gi, pi)] == true
-                                      val locked = t == "Required" || t == "NotUsable" || g.type == "SelectAll"
-                                      val single = g.type == "SelectExactlyOne" || g.type == "SelectAtMostOne"
-                                      Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                                          if (single) RadioButton(sel, { w.toggle(i, gi, pi) }, enabled = !locked)
-                                          else Checkbox(sel, { w.toggle(i, gi, pi) }, enabled = !locked)
-                                          w.images[p.image]?.let { Image(it.asImageBitmap(), null, Modifier.size(64.dp).padding(end = 8.dp)) }
-                                          Column {
-                                              Text(p.name + if (t == "Recommended") " ★" else if (t == "NotUsable") " (unavailable)" else "")
-                                              if (p.desc.isNotBlank()) Text(p.desc.take(300), style = MaterialTheme.typography.bodySmall)
-                                          }
-                                      }
-                                  }
-                              }
-                          }
-                          w.problem()?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                          Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                              TextButton(onClick = onCancel) { Text("Cancel") }
-                              Spacer(Modifier.weight(1f))
-                              if (w.hasPrev()) TextButton(onClick = { w.back() }) { Text("Back") }
-                              Button(enabled = w.problem() == null, onClick = { if (w.hasNext()) w.next() else onFinish() }) { Text(if (w.hasNext()) "Next" else "Install") }
-                          }
-                      }
-                  }
-              }
-          }
-
-          /** Opens a document with read+write access that survives restarts. */
-          class OpenRW : ActivityResultContracts.OpenDocument() {
-              override fun createIntent(context: Context, input: Array<String>): Intent =
-                  super.createIntent(context, input).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                          Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-          }
-
-
-          @Composable
-          fun LoadOrderScreen(mgr: ModManager, mods: List<Mod>, dataUri: Uri?, manual: Uri?, onPick: () -> Unit, onStatus: (String) -> Unit) {
-              val list = remember { mutableStateListOf<PluginEntry>() }
-              var files by remember { mutableStateOf(OrderFiles(null, null, null)) }
-              var star by remember { mutableStateOf(false) }
-              var dirty by remember { mutableStateOf(false) }
-              val scope = rememberCoroutineScope()
-              val ready = files.dir != null || files.plugins != null
-
-              LaunchedEffect(manual, dataUri, mods) {
-                  val f = withContext(Dispatchers.IO) { runCatching { mgr.orderFiles(dataUri, manual) }.getOrDefault(OrderFiles(null, null, null)) }
-                  files = f; list.clear(); dirty = false
-                  if (f.dir == null && f.plugins == null) return@LaunchedEffect
-                  val r = withContext(Dispatchers.IO) { runCatching { mgr.readOrder(f) } }
-                  val (st, entries) = r.onFailure { onStatus("Error: ${it.message}") }.getOrNull() ?: return@LaunchedEffect
-                  val known = entries.map { it.name.lowercase() }.toSet()
-                  val extra = mods.filter { it.enabled }.flatMap { it.plugins }.map { it.substringAfterLast('/') }
-                      .distinctBy { it.lowercase() }.filter { it.lowercase() !in known }.map { PluginEntry(it, false) }
-                  star = st; list.addAll(entries + extra)
-              }
-
-              fun move(i: Int, j: Int) { val e = list[i]; list[i] = list[j]; list[j] = e; dirty = true }
-
-              Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                  Text(if (files.dir != null) "Port folder synced" else "Plugin load order", style = MaterialTheme.typography.titleSmall,
-                      color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                  if (files.dir == null) OutlinedButton(onClick = onPick) { Text(if (manual == null) "Select plugins.txt" else "Change") }
-                  Button(enabled = ready && dirty, onClick = {
-                      val ordered = list.sortedBy { if (it.name.endsWith(".esm", true)) 0 else 1 } // masters always load first
-                      scope.launch {
-                          val r = withContext(Dispatchers.IO) { runCatching { mgr.writeOrder(files, star, ordered, dataUri) } }
-                          if (r.isSuccess) {
-                              list.clear(); list.addAll(ordered); dirty = false
-                              onStatus("Saved (${ordered.count { it.active }} active of ${ordered.size}). ${r.getOrNull().orEmpty()}")
-                          } else onStatus("Error: ${r.exceptionOrNull()?.message}")
-                      }
-                  }) { Icon(Icons.Default.Check, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Save") }
-              }
-              if (!ready) {
-                  Text("Choose the game folder that contains the port folder, or select your plugins.txt manually, to manage plugins and their load order.",
-                      style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
-              } else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                  itemsIndexed(list, key = { _, e -> e.name.lowercase() }) { i, e ->
-                      Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(
-                          containerColor = if (e.active) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest)) {
-                          ListItem(
-                              colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                              leadingContent = { Checkbox(e.active, { list[i] = e.copy(active = it); dirty = true }) },
-                              headlineContent = { Text(e.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                              supportingContent = { Text("#${i + 1}" + if (e.name.endsWith(".esm", true)) " · master" else "") },
-                              trailingContent = {
-                                  Row {
-                                      IconButton(enabled = i > 0, onClick = { move(i, i - 1) }) { Icon(Icons.Default.KeyboardArrowUp, "Move up") }
-                                      IconButton(enabled = i < list.lastIndex, onClick = { move(i, i + 1) }) { Icon(Icons.Default.KeyboardArrowDown, "Move down") }
-                                  }
-                              })
-                      }
-                  }
-              }
-          }
-
-          fun fmtSize(b: Long): String = when {
-              b < 1024 -> "$b B"
-              b < (1L shl 20) -> "%.0f KB".format(b / 1024.0)
-              b < (1L shl 30) -> "%.1f MB".format(b / 1048576.0)
-              else -> "%.2f GB".format(b / 1073741824.0)
-          }
-          SKYEOF
-          cat > app/src/main/java/com/example/skyrimmm/ModManager.kt <<'SKYEOF'
-          package com.example.skyrimmm
-
-          import android.content.Context
-          import android.graphics.Bitmap
-          import android.graphics.BitmapFactory
-          import android.net.Uri
-          import android.os.Build
-          import android.os.Environment
-          import android.provider.DocumentsContract
-          import androidx.documentfile.provider.DocumentFile
-          import org.json.JSONArray
-          import org.json.JSONObject
-          import java.io.ByteArrayOutputStream
-          import java.io.File
-          import java.io.InputStream
-          import java.text.SimpleDateFormat
-          import java.util.Date
-          import java.util.Locale
-          import java.util.UUID
-          import java.util.zip.ZipInputStream
-
-          data class OrderFiles(val plugins: Uri?, val loadOrder: Uri?, val dir: DocumentFile?)
-
-          data class PluginEntry(val name: String, val active: Boolean)
-
-          data class Mod(
-              val id: String, val name: String,
-              val files: List<String>,            // every file the mod wrote (relative to Data/)
-              val dirs: List<String>,             // directories the mod created
-              val backups: Map<String, String>,   // files it overwrote -> backup file name
-              val enabled: Boolean = true,
-              val size: Long = -1                 // bytes the mod wrote, -1 = not measured yet
-          ) {
-              val plugins get() = files.filter { it.substringAfterLast('.').lowercase() in setOf("esp", "esm", "esl") }
-          }
-
-          class ModManager(private val ctx: Context) {
-              private val store = File(ctx.filesDir, "mods").apply { mkdirs() }
-              private val backupRoot = File(ctx.filesDir, "backups").apply { mkdirs() }
-              private val cr = ctx.contentResolver
-              private val known = setOf("meshes", "textures", "scripts", "sound", "interface", "skse", "strings",
-                  "seq", "music", "video", "grass", "lodsettings", "shadersfx", "facegen", "source")
-
-              fun list(): List<Mod> = store.listFiles { f -> f.extension == "json" }.orEmpty()
-                  .map { load(it) }.sortedBy { it.name.lowercase() }
-
-              private fun segs(p: String) = p.replace('\\', '/').split('/').filter { it.isNotEmpty() }
-
-              private fun mapPath(raw: String, hasData: Boolean, wrap: Boolean): List<String>? {
-                  val s = segs(raw)
-                  if (s.any { it == ".." }) return null // zip-slip protection
-                  val rel = when {
-                      hasData -> {
-                          val i = s.indexOfFirst { it.equals("data", true) }
-                          if (i in 0..1 && i < s.size - 1) s.drop(i + 1) else return null
-                      }
-                      wrap -> s.drop(1)
-                      else -> s
-                  }
-                  return rel.takeIf { it.isNotEmpty() && !it.first().equals("fomod", true) }
-              }
-
-              private fun newFile(dir: DocumentFile, name: String): DocumentFile? =
-                  if (dir.uri.scheme == "file") DocumentFile.fromFile(File(dir.uri.path!!, name).also { it.createNewFile() })
-                  else dir.createFile("application/octet-stream", name)
-
-              private fun norm(p: String) = segs(p).joinToString("/").lowercase()
-              private fun zipName(u: Uri) = (DocumentFile.fromSingleUri(ctx, u)?.name ?: "mod").let { n -> if (n.substringAfterLast('.', "").lowercase() in setOf("zip", "7z", "rar")) n.substringBeforeLast('.') else n }
-
-              private fun entryNames(zipUri: Uri): List<String> = openArchive(ctx, zipUri).use { it.names() }
-
-              /** Best-effort reasons a mod needs SKSE (empty list = no sign of it). Checks files, compiled scripts, the FOMOD config and readmes. */
-              fun skseReasons(zipUri: Uri): List<String> {
-                  Progress.report("Reading archive", "Checking for SKSE…", null, force = true)
-                  val reasons = mutableListOf<String>()
-                  openArchive(ctx, zipUri).use { arch ->
-                      arch.names().firstOrNull { n ->
-                          val s = segs(n).map { it.lowercase() }
-                          "skse" in s.dropLast(1) || s.last().let { it.startsWith("skse") && (it.endsWith(".dll") || it.endsWith(".exe")) }
-                      }?.let { reasons += "It ships SKSE plugin files (${segs(it).takeLast(2).joinToString("/")})" }
-                      var pex = 0; var scripts = false; var installer = false; var readme = false
-                      arch.forEach { n, s ->
-                          val low = n.lowercase()
-                          val file = segs(n).lastOrNull().orEmpty()
-                          when {
-                              !scripts && low.endsWith(".pex") && pex++ < 300 -> {
-                                  val txt = String(s.readUpTo(400_000), Charsets.ISO_8859_1)
-                                  SKSE_TERMS.firstOrNull { it in txt }?.let { reasons += "Its scripts ($file) use SKSE-only features (found: $it)"; scripts = true }
-                              }
-                              !installer && low.endsWith("moduleconfig.xml") -> {
-                                  if ("skse" in decodeText(s.readUpTo(500_000)).lowercase()) { reasons += "Its installer (ModuleConfig.xml) mentions SKSE"; installer = true }
-                              }
-                              !readme && (low.endsWith(".txt") || low.endsWith(".md") || low.endsWith(".rtf")) && !low.endsWith("plugins.txt") -> {
-                                  if (readmeNeedsSkse(decodeText(s.readUpTo(200_000)))) { reasons += "A readme ($file) says it requires SKSE"; readme = true }
-                              }
-                          }
-                          !(scripts && installer && readme)
-                      }
-                  }
-                  return reasons
-              }
-
-              /** Which of the given paths (relative to Data) exist, normalised with normPath. */
-              fun existing(dataUri: Uri, paths: Set<String>): Set<String> {
-                  val idx = runCatching { Idx(dataRoot(dataUri)) }.getOrNull() ?: return emptySet()
-                  return paths.filter { p ->
-                      val s = segs(p)
-                      s.isNotEmpty() && idx.children(s.dropLast(1))?.containsKey(s.last().lowercase()) == true
-                  }.map { normPath(it) }.toSet()
-              }
-
-              /** Thumbnails for the wizard's option images, keyed by the image path written in the config. */
-              fun loadImages(zipUri: Uri, pack: FomodPack): Map<String, Bitmap> {
-                  val want = pack.config.steps.flatMap { it.groups }.flatMap { it.plugins }.map { it.image }
-                      .filter { it.isNotBlank() }.associateBy { normPath(pack.prefix + "/" + it) }
-                  if (want.isEmpty()) return emptyMap()
-                  Progress.report("Reading archive", "Loading option images…", null, force = true)
-                  val out = mutableMapOf<String, Bitmap>()
-                  openArchive(ctx, zipUri).use { a -> a.forEach { n, s ->
-                      val key = want[normPath(n)]
-                      if (key != null) {
-                          val b = s.readBytes()
-                          if (b.size <= 3_000_000)
-                              BitmapFactory.decodeByteArray(b, 0, b.size, BitmapFactory.Options().apply { inSampleSize = 2 })?.let { out[key] = it }
-                      }
-                      true
-                  } }
-                  return out
-              }
-
-              /** Returns the parsed FOMOD installer if the zip has one, otherwise null. */
-              fun readFomod(zipUri: Uri): FomodPack? {
-                  val names = entryNames(zipUri)
-                  val cfg = names.firstOrNull { norm(it).endsWith("fomod/moduleconfig.xml") } ?: return null
-                  var xml: ByteArray? = null
-                  openArchive(ctx, zipUri).use { a -> a.forEach { n, s -> if (n == cfg) { xml = s.readBytes(); false } else true } }
-                  return FomodPack(parseFomod(xml!!), segs(cfg).dropLast(2).joinToString("/"), names)
-              }
-
-              fun install(dataUri: Uri, zipUri: Uri): Mod {
-                  val names = entryNames(zipUri)
-                  if (names.isEmpty()) error("Empty zip")
-                  val hasData = names.any { n -> segs(n).let { s -> s.indexOfFirst { it.equals("data", true) }.let { it in 0..1 && it < s.size - 1 } } }
-                  val firsts = names.map { segs(it).firstOrNull()?.lowercase() }.toSet()
-                  val wrap = !hasData && firsts.size == 1 && names.all { segs(it).size > 1 } && firsts.first() !in known
-                  return extract(dataUri, zipUri, zipName(zipUri)) { n -> mapPath(n, hasData, wrap)?.let { listOf(it) } ?: emptyList() }
-              }
-
-              /** Installs the files a FOMOD wizard selected, honouring source -> destination mappings and priorities. */
-              fun installFomod(dataUri: Uri, zipUri: Uri, pack: FomodPack, chosen: List<FFile>): Mod {
-                  val pre = segs(pack.prefix)
-                  class Pick(val dst: List<String>, val src: String, val pri: Int)
-                  val best = mutableMapOf<String, Pick>()
-                  fun offer(dst: List<String>, src: String, pri: Int) {
-                      if (dst.isEmpty() || dst.any { it == ".." }) return
-                      val k = dst.joinToString("/").lowercase()
-                      if (best[k] == null || pri >= best[k]!!.pri) best[k] = Pick(dst, src, pri)
-                  }
-                  for (f in chosen) {
-                      val src = pre + segs(f.src); val sn = src.joinToString("/").lowercase()
-                      if (f.folder) {
-                          for (n in pack.names) {
-                              val s = segs(n)
-                              if (s.size > src.size && s.take(src.size).joinToString("/").lowercase() == sn)
-                                  offer(segs(f.dst) + s.drop(src.size), n, f.priority)
-                          }
-                      } else pack.names.firstOrNull { norm(it) == sn }?.let { n ->
-                          val d = when {
-                              f.dst.isEmpty() -> segs(f.src)
-                              f.dst.endsWith("/") || f.dst.endsWith("\\") -> segs(f.dst) + segs(f.src).last()
-                              else -> segs(f.dst)
-                          }
-                          offer(d, n, f.priority)
-                      }
-                  }
-                  val plan = best.values.groupBy({ it.src }, { it.dst })
-                  return extract(dataUri, zipUri, zipName(zipUri)) { n -> plan[n].orEmpty() }
-              }
-
-              private fun extract(dataUri: Uri, zipUri: Uri, name: String, plan: (String) -> List<List<String>>): Mod {
-                  val idx = Idx(dataRoot(dataUri))
-                  val id = UUID.randomUUID().toString().take(8)
-                  val bdir = File(backupRoot, id).apply { mkdirs() }
-                  val files = mutableListOf<String>(); val dirs = mutableListOf<String>()
-                  val backups = mutableMapOf<String, String>()
-                  var bytes = 0L
-                  try {
-                      Progress.report("Installing $name", "Preparing…", null, force = true)
-                      openArchive(ctx, zipUri).use { arch ->
-                          var n = 0; var done = 0
-                          val total = arch.names().count { plan(it).isNotEmpty() }.coerceAtLeast(1)
-                          arch.forEach { entryName, z ->
-                              var first: DocumentFile? = null
-                              for (rel in plan(entryName)) {
-                                  val parent = rel.dropLast(1)
-                                  val dir = idx.dir(parent, dirs) ?: error("Cannot create folder ${parent.joinToString("/")}")
-                                  val kids = idx.children(parent)!!
-                                  val fname = rel.last(); val relStr = rel.joinToString("/")
-                                  kids.remove(fname.lowercase())?.let { old ->
-                                      val b = "${n++}.bak"
-                                      cr.openInputStream(old.uri)!!.use { i -> File(bdir, b).outputStream().use { i.copyTo(it, BUF) } }
-                                      backups[relStr] = b
-                                      old.delete()
-                                  }
-                                  val out = newFile(dir, fname) ?: error("Cannot create $fname")
-                                  kids[fname.lowercase()] = out
-                                  files += relStr
-                                  if (first == null) { bytes += cr.openOutputStream(out.uri)!!.use { z.copyTo(it, BUF) }; first = out }
-                                  else bytes += cr.openInputStream(first.uri)!!.use { i -> cr.openOutputStream(out.uri)!!.use { i.copyTo(it, BUF) } }
-                              }
-                              if (first != null) { done++; Progress.report("Installing $name", files.lastOrNull().orEmpty(), done.toFloat() / total) }
-                              true
-                          }
-                      }
-                      if (files.isEmpty()) error("No installable files found in archive")
-                  } catch (t: Throwable) {
-                      uninstall(dataUri, Mod(id, name, files, dirs, backups)); throw t
-                  } finally { Stage.clear(ctx) }
-                  return Mod(id, name, files, dirs, backups, true, bytes).also { save(it) }
-              }
-
-              /** Removes every file the mod wrote, restores anything it overwrote, and prunes folders it created. */
-              fun uninstall(dataUri: Uri, mod: Mod) {
-                  var done = 0
-                  Progress.report("Uninstalling ${mod.name}", "Preparing…", null, force = true)
-                  val idx = Idx(dataRoot(dataUri))
-                  val bdir = File(backupRoot, mod.id)
-                  for ((parent, group) in mod.files.groupBy { segs(it).dropLast(1) }) {
-                      val dir = idx.dir(parent, if (group.any { it in mod.backups }) mutableListOf() else null) ?: continue
-                      val kids = idx.children(parent) ?: continue
-                      for (f in group) {
-                          val fname = segs(f).last(); val key = fname.lowercase()
-                          Progress.report("Uninstalling ${mod.name}", f, (++done).toFloat() / mod.files.size)
-                          kids.remove(key)?.delete()
-                          kids.remove("$key.disabled")?.delete()
-                          mod.backups[f]?.let { b ->
-                              val out = newFile(dir, fname) ?: return@let
-                              kids[key] = out
-                              File(bdir, b).inputStream().use { i -> cr.openOutputStream(out.uri)!!.use { i.copyTo(it, BUF) } }
-                          }
-                      }
-                  }
-                  mod.dirs.sortedByDescending { segs(it).size }.forEach { d ->
-                      val p = segs(d)
-                      if (idx.children(p)?.isEmpty() == true) idx.removeDir(p)
-                  }
-                  bdir.deleteRecursively(); File(store, "${mod.id}.json").delete()
-              }
-
-              /** True when the app has All files access, so shared-storage folders can be used as plain files (far faster than SAF). */
-              fun fastAccess() = Build.VERSION.SDK_INT >= 30 && Environment.isExternalStorageManager()
-
-              private fun rootOf(uri: Uri): DocumentFile? {
-                  if (fastAccess() && uri.authority == "com.android.externalstorage.documents") {
-                      val id = DocumentsContract.getTreeDocumentId(uri)
-                      val vol = id.substringBefore(':')
-                      val base = if (vol == "primary") Environment.getExternalStorageDirectory() else File("/storage/$vol")
-                      val f = File(base, id.substringAfter(':', ""))
-                      if (f.isDirectory) return DocumentFile.fromFile(f)
-                  }
-                  return DocumentFile.fromTreeUri(ctx, uri)
-              }
-
-              /** The selected folder may be the game folder (containing Data) or the Data folder itself. */
-              private fun dataRoot(uri: Uri): DocumentFile {
-                  val r = rootOf(uri) ?: error("Invalid folder")
-                  if (r.name.equals("data", true)) return r
-                  return r.listFiles().firstOrNull { it.isDirectory && it.name.equals("data", true) }
-                      ?: error("No Data folder found in the selected folder")
-              }
-
-              /** <game root>/port/save/AppData/Local/Skyrim, where the Skyrim Android port keeps Plugins.txt and loadorder.txt. */
-              fun findPortDir(dataUri: Uri): DocumentFile? {
-                  val root = rootOf(dataUri) ?: return null
-                  return Idx(root).dir(listOf("port", "save", "AppData", "Local", "Skyrim"))
-              }
-
-              private fun childFile(dir: DocumentFile, name: String) = dir.listFiles().firstOrNull { it.isFile && it.name.equals(name, true) }
-
-              fun describe(dataUri: Uri): String {
-                  dataRoot(dataUri)
-                  return if (findPortDir(dataUri) != null) "Folder set. Data folder found, and the port folder was detected, so plugins sync automatically."
-                  else "Folder set. Data folder found. No port folder detected; pick plugins.txt on the Load order tab."
-              }
-
-              fun clearStage() = Stage.clear(ctx)
-
-              /** Port folder files win when the port folder exists; otherwise the manually selected plugins.txt is used. */
-              fun orderFiles(dataUri: Uri?, manual: Uri?): OrderFiles {
-                  val dir = dataUri?.let { findPortDir(it) }
-                  return when {
-                      dir != null -> OrderFiles(childFile(dir, "plugins.txt")?.uri, childFile(dir, "loadorder.txt")?.uri, dir)
-                      manual != null -> OrderFiles(manual, null, null)
-                      else -> OrderFiles(null, null, null)
-                  }
-              }
-
-              /** loadorder.txt gives the full order (inactive plugins too); plugins.txt says which are active. */
-              fun readOrder(f: OrderFiles): Pair<Boolean, List<PluginEntry>> {
-                  val (star, active) = f.plugins?.let { readPlugins(it) } ?: (false to emptyList<PluginEntry>())
-                  val order = f.loadOrder?.let { u ->
-                      cr.openInputStream(u)!!.use { it.readBytes() }.toString(Charsets.UTF_8).removePrefix("\uFEFF").lines()
-                          .map { it.trim().removePrefix("*") }.filter { it.isNotEmpty() && !it.startsWith("#") }.distinctBy { it.lowercase() }
-                  }.orEmpty()
-                  if (order.isEmpty()) return star to active
-                  val on = active.filter { it.active }.map { it.name.lowercase() }.toSet()
-                  val have = order.map { it.lowercase() }.toSet()
-                  return star to (order.map { PluginEntry(it, it.lowercase() in on) } + active.filter { it.name.lowercase() !in have })
-              }
-
-              /** Copies the current plugins.txt / loadorder.txt into "SkyrimMM Backups/Load order" in the game folder before they are overwritten. */
-              private fun backupOrder(dataUri: Uri?, f: OrderFiles): String {
-                  val srcs = listOfNotNull(f.plugins?.let { "Plugins" to it }, f.loadOrder?.let { "loadorder" to it })
-                  if (srcs.isEmpty()) return "No previous files to back up."
-                  val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
-                  val dir = dataUri?.let { rootOf(it) }?.let { Idx(it).dir(listOf("SkyrimMM Backups", "Load order"), mutableListOf()) }
-                  for ((label, uri) in srcs) {
-                      val bytes = cr.openInputStream(uri)!!.use { it.readBytes() }
-                      val name = "$label-$stamp.txt"
-                      if (dir != null) {
-                          val out = newFile(dir, name) ?: error("Cannot create the backup file")
-                          cr.openOutputStream(out.uri, "wt")!!.use { it.write(bytes) }
-                      } else File(File(ctx.filesDir, "order_backups").apply { mkdirs() }, name).writeBytes(bytes)
-                  }
-                  dir?.let { d -> // keep the newest 10 backups of each file
-                      for (label in listOf("Plugins-", "loadorder-"))
-                          d.listFiles().filter { it.name.orEmpty().startsWith(label) }.sortedBy { it.name }.dropLast(10).forEach { it.delete() }
-                  }
-                  return if (dir != null) "Backup saved in SkyrimMM Backups/Load order." else "Backup saved inside the app only."
-              }
-
-              fun writeOrder(f: OrderFiles, star: Boolean, list: List<PluginEntry>, dataUri: Uri? = null): String {
-                  val note = backupOrder(dataUri, f) // if the backup fails this throws and nothing is overwritten
-                  val p = f.plugins ?: f.dir?.let { newFile(it, "Plugins.txt") }?.uri ?: error("No plugins.txt selected")
-                  writePlugins(p, star, list)
-                  f.dir?.let { d ->
-                      val lo = f.loadOrder ?: newFile(d, "loadorder.txt")?.uri ?: error("Cannot create loadorder.txt")
-                      cr.openOutputStream(lo, "wt")!!.use { it.write((list.joinToString("\r\n") { e -> e.name } + "\r\n").toByteArray(Charsets.UTF_8)) }
-                  }
-                  return note
-              }
-
-              /** Works out the size of a mod installed before sizes were recorded (reads fresh data, so it can't undo a toggle). */
-              fun measure(dataUri: Uri, mod: Mod): Mod {
-                  val idx = Idx(dataRoot(dataUri))
-                  var total = 0L
-                  for ((parent, group) in mod.files.groupBy { segs(it).dropLast(1) }) {
-                      val kids = idx.children(parent) ?: continue
-                      for (f in group) {
-                          val n = segs(f).last().lowercase()
-                          total += (kids[n] ?: kids["$n.disabled"])?.length() ?: 0L
-                      }
-                  }
-                  val cur = list().firstOrNull { it.id == mod.id } ?: return mod
-                  return cur.copy(size = total).also { save(it) }
-              }
-
-              /** Disables a mod by renaming its files to *.disabled (restoring anything it overwrote), or re-enables it. */
-              fun setEnabled(dataUri: Uri, mod: Mod, enable: Boolean): Mod {
-                  if (mod.enabled == enable) return mod
-                  var done = 0
-                  val title = (if (enable) "Enabling " else "Disabling ") + mod.name
-                  Progress.report(title, "Preparing…", null, force = true)
-                  val idx = Idx(dataRoot(dataUri))
-                  val bdir = File(backupRoot, mod.id)
-                  for ((parent, group) in mod.files.groupBy { segs(it).dropLast(1) }) {
-                      val dir = idx.dir(parent) ?: continue
-                      val kids = idx.children(parent) ?: continue
-                      for (f in group) {
-                          val name = segs(f).last(); val key = name.lowercase()
-                          Progress.report(title, f, (++done).toFloat() / mod.files.size)
-                          if (!enable) {
-                              val file = kids.remove(key) ?: continue
-                              if (!file.renameTo("$name.disabled")) error("Cannot rename $name")
-                              kids["$key.disabled"] = file
-                              mod.backups[f]?.let { b ->
-                                  newFile(dir, name)?.let { out ->
-                                      kids[key] = out
-                                      File(bdir, b).inputStream().use { i -> cr.openOutputStream(out.uri)!!.use { i.copyTo(it, BUF) } }
-                                  }
-                              }
-                          } else {
-                              val off = kids.remove("$key.disabled") ?: continue
-                              mod.backups[f]?.let { b ->
-                                  kids.remove(key)?.let { cur ->
-                                      cr.openInputStream(cur.uri)!!.use { i -> File(bdir, b).outputStream().use { i.copyTo(it, BUF) } }
-                                      cur.delete()
-                                  }
-                              }
-                              if (!off.renameTo(name)) error("Cannot rename $name")
-                              kids[key] = off
-                          }
-                      }
-                  }
-                  return mod.copy(enabled = enable).also { save(it) }
-              }
-
-              /** Reads plugins.txt. Returns (usesAsterisks, entries): LE lists only active plugins in load order; SE-style marks active ones with *. */
-              fun readPlugins(uri: Uri): Pair<Boolean, List<PluginEntry>> {
-                  val text = cr.openInputStream(uri)!!.use { it.readBytes() }.toString(Charsets.UTF_8).removePrefix("\uFEFF")
-                  val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
-                  val star = lines.any { it.startsWith("*") }
-                  return star to lines.map { PluginEntry(it.removePrefix("*"), !star || it.startsWith("*")) }.distinctBy { it.name.lowercase() }
-              }
-
-              /** Writes plugins.txt in the same style it was read in, keeping a backup copy of the previous file. */
-              fun writePlugins(uri: Uri, star: Boolean, list: List<PluginEntry>) {
-                  cr.openInputStream(uri)?.use { File(ctx.filesDir, "plugins.txt.bak").writeBytes(it.readBytes()) }
-                  val out = if (star) list.map { (if (it.active) "*" else "") + it.name } else list.filter { it.active }.map { it.name }
-                  cr.openOutputStream(uri, "wt")!!.use { it.write((out.joinToString("\r\n") + "\r\n").toByteArray(Charsets.UTF_8)) }
-              }
-
-              private fun save(m: Mod) = File(store, "${m.id}.json").writeText(
-                  JSONObject().put("id", m.id).put("name", m.name).put("files", JSONArray(m.files))
-                      .put("dirs", JSONArray(m.dirs)).put("backups", JSONObject(m.backups)).put("enabled", m.enabled).put("size", m.size).toString())
-
-              private fun load(f: File): Mod {
-                  val o = JSONObject(f.readText())
-                  fun JSONArray.strs() = List(length()) { getString(it) }
-                  val b = o.getJSONObject("backups")
-                  return Mod(o.getString("id"), o.getString("name"), o.getJSONArray("files").strs(),
-                      o.getJSONArray("dirs").strs(), b.keys().asSequence().associateWith { b.getString(it) }, o.optBoolean("enabled", true), o.optLong("size", -1))
-              }
-          }
-
-          private const val BUF = 1 shl 16
-
-          /** Cached view of the Data tree: every folder is listed at most once, which matters a lot over SAF. */
-          private class Idx(val root: DocumentFile) {
-              private val dirs = HashMap<String, DocumentFile>()
-              private val kids = HashMap<String, MutableMap<String, DocumentFile>>()
-              private fun key(p: List<String>) = p.joinToString("/").lowercase()
-              private fun kidsOf(p: List<String>, d: DocumentFile) =
-                  kids.getOrPut(key(p)) { d.listFiles().associateByTo(HashMap()) { it.name.orEmpty().lowercase() } }
-
-              /** Finds a folder; when `created` is given, missing folders are created and their paths recorded in it. */
-              fun dir(p: List<String>, created: MutableList<String>? = null): DocumentFile? {
-                  if (p.isEmpty()) return root
-                  dirs[key(p)]?.let { return it }
-                  val parentPath = p.dropLast(1)
-                  val parent = dir(parentPath, created) ?: return null
-                  val siblings = kidsOf(parentPath, parent)
-                  var d = siblings[p.last().lowercase()]?.takeIf { it.isDirectory }
-                  if (d == null && created != null) {
-                      d = parent.createDirectory(p.last()) ?: error("Cannot create folder ${p.last()}")
-                      siblings[p.last().lowercase()] = d
-                      kids[key(p)] = HashMap()
-                      created += p.joinToString("/")
-                  }
-                  return d?.also { dirs[key(p)] = it }
-              }
-
-              /** The (editable) name -> file listing of a folder, or null if the folder doesn't exist. */
-              fun children(p: List<String>): MutableMap<String, DocumentFile>? = dir(p)?.let { kidsOf(p, it) }
-
-              fun removeDir(p: List<String>) {
-                  val d = dir(p) ?: return
-                  d.delete()
-                  dirs.remove(key(p)); kids.remove(key(p))
-                  kids[key(p.dropLast(1))]?.remove(p.last().lowercase())
-              }
-          }
-
-          private val SKSE_TERMS = listOf("SKSE", "ModEvent", "StringUtil", "NetImmerse", "UICallback", "SKI_ConfigBase", "StorageUtil",
-              "JsonUtil", "MiscUtil", "ActorUtil", "ConsoleUtil", "JContainers", "JValue", "PO3_SKSEFunctions", "PapyrusUtil")
-          private val SKSE_MENTION = Regex("skse|script extender")
-          private val NEEDS_WORDS = Regex("requir|need|depend|must|mandatory")
-          private val NOT_NEEDED = Regex("optional|not required|n't require|no need|without|not need|n't need")
-
-          /** True if a readme mentions SKSE close to words like "requires" (and not "optional" or "not required"). */
-          private fun readmeNeedsSkse(text: String): Boolean {
-              val t = text.lowercase()
-              return SKSE_MENTION.findAll(t).any { m ->
-                  val w = t.substring(maxOf(0, m.range.first - 80), minOf(t.length, m.range.last + 81))
-                  NEEDS_WORDS.containsMatchIn(w) && !NOT_NEEDED.containsMatchIn(w)
-              }
-          }
-
-          private fun InputStream.readUpTo(max: Int): ByteArray {
-              val out = ByteArrayOutputStream(); val buf = ByteArray(8192); var left = max
-              while (left > 0) { val n = read(buf, 0, minOf(buf.size, left)); if (n < 0) break; out.write(buf, 0, n); left -= n }
-              return out.toByteArray()
-          }
-
-          private fun decodeText(b: ByteArray): String = when {
-              b.size >= 2 && b[0] == 0xFF.toByte() && b[1] == 0xFE.toByte() -> String(b, Charsets.UTF_16LE)
-              b.size >= 2 && b[0] == 0xFE.toByte() && b[1] == 0xFF.toByte() -> String(b, Charsets.UTF_16BE)
-              else -> String(b, Charsets.UTF_8)
-          }
-          SKYEOF
-          cat > app/src/main/res/drawable/ic_launcher_background.xml <<'SKYEOF'
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:aapt="http://schemas.android.com/aapt"
-              android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-              <path android:pathData="M0,0h108v108h-108z">
-                  <aapt:attr name="android:fillColor">
-                      <gradient android:type="linear" android:startX="54" android:startY="0" android:endX="54" android:endY="108">
-                          <item android:offset="0" android:color="#FF08183C"/>
-                          <item android:offset="1" android:color="#FF2757A8"/>
-                      </gradient>
-                  </aapt:attr>
-              </path>
-              <!-- a few stars -->
-              <path android:fillColor="#CCFFFFFF"
-                  android:pathData="M22,24 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0 Z M40,16 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0 Z M30,38 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0 Z M58,22 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0 Z M88,60 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0 Z M18,58 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0 Z"/>
-          </vector>
-          SKYEOF
-          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'SKYEOF'
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-              <!-- the two moons -->
-              <path android:fillColor="#F4EBD0" android:pathData="M64,32 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 Z"/>
-              <path android:fillColor="#BFD3F2" android:pathData="M77,41 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z"/>
-              <!-- distant peak -->
-              <path android:fillColor="#7C9AD0" android:pathData="M50,74 L66,48 L82,74 Z"/>
-              <path android:fillColor="#5D7DB8" android:pathData="M66,48 L82,74 L72,74 L68,60 Z"/>
-              <!-- main snowy peak with a shaded right face -->
-              <path android:fillColor="#EEF4FC" android:pathData="M26,74 L46,38 L66,74 Z"/>
-              <path android:fillColor="#B4C8E8" android:pathData="M46,38 L66,74 L54,74 L48,56 Z"/>
-              <!-- snowy ground -->
-              <path android:fillColor="#EEF4FC" android:pathData="M26,74 L82,74 L82,77 C82,79 80,80 78,80 L30,80 C28,80 26,79 26,77 Z"/>
-          </vector>
-          SKYEOF
-          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'SKYEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@drawable/ic_launcher_background"/>
-              <foreground android:drawable="@drawable/ic_launcher_foreground"/>
-              <monochrome android:drawable="@drawable/ic_launcher_foreground"/>
-          </adaptive-icon>
-          SKYEOF
-          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml <<'SKYEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@drawable/ic_launcher_background"/>
-              <foreground android:drawable="@drawable/ic_launcher_foreground"/>
-              <monochrome android:drawable="@drawable/ic_launcher_foreground"/>
-          </adaptive-icon>
-          SKYEOF
-          cat > app/src/main/res/values-night/themes.xml <<'SKYEOF'
-          <resources>
-              <style name="Theme.SkyrimMM" parent="android:Theme.Material.NoActionBar" />
-          </resources>
-          SKYEOF
-          cat > app/src/main/res/values/colors.xml <<'SKYEOF'
-          <resources><color name="ic_bg">#1B2430</color></resources>
-          SKYEOF
-          cat > app/src/main/res/values/themes.xml <<'SKYEOF'
-          <resources>
-              <style name="Theme.SkyrimMM" parent="android:Theme.Material.Light.NoActionBar" />
-          </resources>
-          SKYEOF
-          cat > build.gradle.kts <<'SKYEOF'
-          plugins {
-              id("com.android.application") version "8.5.2" apply false
-              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
-          }
-          SKYEOF
-          cat > gradle.properties <<'SKYEOF'
-          org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          kotlin.code.style=official
-          SKYEOF
-          cat > release-notes.md <<'SKYEOF'
-          # Skyrim Mod Manager v1.2.X-beta
-
-          This release adds complete uninstall, FOMOD installers, 7z and RAR support, enable and disable, and load order editing with automatic backups for Skyrim Legendary Edition on Android.
-
-          **Beta software: back up your Skyrim folder before testing.**
-
-          ## What’s new
-
-          - **Complete uninstall.** The app records every file a mod writes and every folder it creates. Uninstalling removes all of them, including plugins, textures, meshes and scripts, restores any files the mod overwrote, and removes created folders if they are empty.
-          - **Uninstall preview.** Before you confirm, Show details lists exactly which files will be removed, which will be restored to their original version, and which folders will be removed if left empty.
-          - **FOMOD installers.** Mods with an installer wizard show their option pages with images, required and recommended options, conditions, and selection rules.
-          - **Archive support.** Install from `.zip`, `.7z` and `.rar` archives. Zips using LZMA, Deflate64 or BZip2 compression are supported. The format is detected from the file contents, not its extension.
-          - **Enable and disable.** Each mod has a switch. Disabling keeps the files but stops the game loading them, and restores anything the mod had overwritten. Enabling reverses it.
-          - **Mod details.** Each mod shows its file count, total size and plugins. Tap the circle to list every file it installed.
-          - **Load order.** Activate or deactivate plugins and reorder them through `Plugins.txt` and `loadorder.txt`. When the game folder contains the port folder (`port/save/AppData/Local/Skyrim`), both files are found automatically. Otherwise you can select `plugins.txt` manually. Masters always stay above other plugins.
-          - **Load order backups.** Every time you save the load order, the current files are copied into `SkyrimMM Backups/Load order` in your game folder first. The newest 10 of each are kept. If a backup cannot be made, nothing is overwritten.
-          - **SKSE warning.** Before installing a mod that appears to need SKSE, the app explains why it was flagged. Detection checks file names, compiled scripts, FOMOD configs and readmes.
-          - **Progress window.** Installing, uninstalling, and switching a mod on or off show what is happening and how far along it is.
-          - **Fast mode.** With Android’s All files access enabled, the app works on files directly instead of through the folder picker, which is much faster.
-
-          ## Changes
-
-          - **Choose the game folder.** Select the folder that contains `Data`. The app finds `Data` and the port folder inside it. Selecting `Data` directly still works.
-
-          ## Fixes
-
-          - **LZMA zips.** Archives compressed with LZMA no longer fail with “bad compression method”.
-          - **Updates.** Every build is signed with the same key and has a rising version number, so a new APK installs over the previous one and keeps your mod list.
-          - **Speed.** Each folder is looked up once per install or uninstall, and archives are read once instead of several times.
-
-          ## Known issues
-
-          - SKSE mods are not supported. The SKSE warning is a best guess and can be wrong in both directions.
-          - RAR5, password-protected, and multi-part archives are rejected.
-          - Only mods installed through the app are tracked. Mods copied into `Data` by hand do not appear.
-          - If two mods overwrite the same file, uninstall or disable them in reverse order of installation.
-          - FOMOD conditions that check for files outside `Data`, such as `skse_loader.exe`, see those files as missing.
-          - Load order is edited manually. There is no automatic sorting.
-          - Disabling a mod does not remove its plugin from `Plugins.txt`. Untick it on the Load order tab.
-          - Android does not allow access to another application’s protected `Android/data` directory.
-
-          ## Upgrade notes
-
-          - Install this APK over the previous build. Do not uninstall first if you want to keep your mod list.
-          - If Android refuses the update (builds made before the signing fix used different keys), uninstall the app once and install again. Uninstall your mods inside the app first, because removing the app erases its record of installed mods.
-          - Enable All files access when prompted for faster installs and uninstalls.
-          - Back up `Plugins.txt` and `loadorder.txt` before saving a load order for the first time.
-
-          ## Feedback
-
-          When reporting a problem, include:
-
-          - Android version and device model
-          - Mod name and a link to its page
-          - Archive format
-          - Steps that caused the problem
-          - The exact error message shown by the app
-          - Screenshots when available
-
-          Thank you to everyone testing Skyrim Mod Manager.
-          SKYEOF
-          cat > settings.gradle.kts <<'SKYEOF'
-          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-          dependencyResolutionManagement { repositories { google(); mavenCentral() } }
-          rootProject.name = "SkyrimMM"
-          include(":app")
+          base64 -d <<'SKYEOF' | tar xz
+          H4sIAAAAAAAC/+y9zXbcSLImWGs+BRStrgRSQZCUlMosUpSKkshKdumvSWZmd6ny6IIRCBLJCCAK
+          QIhkqnjO3fQT9GbOnFnMmcV9hdnPo9STjH1m7g53/MQPpcy63Te1EEkA/mdubm7/Fp4lZXKWZnn8
+          u1/s3yb9e/TwIf+kf/Wfm1ubX5nf5fnXj77e+p23+btf4d+sKKPc8373H/RfeJZHw3G8sXY6S8bD
+          jbVxNojG4TTPpnFeJnGxFibDONpY+zJMJmP6P5pe0P8X8XVREs7Qrz9dFGu/++3f/6r/oul0g7de
+          IUJ4URa/8vl/+MCiBfx8a+urh7+d/1/l33Q8O0vSwvvoJUO/N8gmYZQO8ywZ0kmfjpNBVCZZ2gt2
+          +HWWn4U/xeVpHlGT8CIrx0mqv+8F3s3a2saGd3Iee5dZfjEaZ5feNCqKuPDW336I84J6ep4N493H
+          6ROvyLyYnl17jHzeeVR4kXeenJ3Huae+9crzCP/F3jgqynDtQzT2BtTe2/V8IlA/xYMyHCXp8K0Q
+          q2u/Zw1C06Euj8s8Sc+eBk/DMjtMyzf569l47Afe021va01N3Pu45tG/NJrExTQaoHuGQ3wVTaZ0
+          IIqL6zyZTCY9/ozeTJNxfDy8oO8ePORnw3gUzcbl8ywdJWcESQtyh8PO7na8SZJKP/cf7XiEhWdx
+          qfvd8ay10BOs2zx7TVNdCAR85AIBq+5thffDzR5tFSZOu/Umjb1RchUPPaLp3ijL7W3pY5siL40v
+          vb23f/Zo08toPC68jD7hjZnm8Yckm9ET6gav42joZSOabjoiEJQ0rneZlOdeQvuHEQviNeihgKpQ
+          oGe45nFUxn6P50Lzrt5wM1w2BwR3WvaIfvg9DUZzFQFH+ZeT6ynv4fRiUGzd7zn9KPTUbbgvj/CA
+          5lcwrhLiDrHH9CrPJl4eT7MioU+vvSKmKdJXUalQtkzoK7+IY4aExvggbE78re541zumgeNJSDsd
+          px/83p/3//vxyZuj/fdv946Pf3hz9AKroNntjRPaOFqEhS30eKWOzDxkr+V/njogZMOeOnl2DXzx
+          e3k8jqMCiEMEoXiVpMnoej+NTscxBh1F44LQ0NlEeuxuamh1p3fzpm2sYXw6O+ORbtuh/E9EqKRO
+          Bufx4OJI5v8MyyyqGUenWV6+SffznBBcPbUhckDIN8sBFD7gWQEMKvOZ/kg9fDPFmcZXQvueCzHI
+          969oF3DovleUaxcH7atw62HP6oC+rDooslk+iNEB0YnTZJyU19Tqv0QfItVH+P3+0fHhm9fvt77W
+          xGG5r9WIMsNqwJ8+TE64F57c13piRPEuojOc04+E7TKrgojVYDwbEjzu7RJ4i/LNyO+92j/ZWz98
+          fbDxYv/t/usX+6+fH+4f9/pe9eLl4fP918f7XzoPX785ocfus0Nq/t/Cl4fHJ85jRbmKjS+/5C2+
+          WRvG0zgdxukgMQibgIpO4rRk+upPx1FJVGvi9xQ5vwrVZm2rn+un2WT7/ub9h+Hmo3BzsxcEbf00
+          mocTokd5Eo0fbJvfeis2NS3XE6KIxfqA6dRyfcyS7Vmy6OOISOwHQoZt/cu6XvxW+Aei8wuaD7PB
+          DM9BBredP7bCzXCrozm4gIjw5jzGZCe0sG31k0cnLCqo/f1H4f05HZSziyhKk+2rnzHVjg9xb5J8
+          ej47DX+apXmUb6sfX9Ph+ooa3fwmenwG/r/IBxsTYuk29gQxXtHGjGJiua4m41+D/390vyb/bz3E
+          j9/4/1/h3+OntMmasdylW4uYQ6K32ZCuhN3erBytf9N7+mTt8UThhEef04FXJGS3d16W0+2NjYKo
+          wSQqjPBAJ3cjml5sEDHY0ALCEz7jj2ckEKwTrzpJCr4r1ettMOC7mjaF1Qfhq73Xe3/af7//3072
+          j17vvXwPRoce9LwN1aPFb5vexrjrvo2j6W4P93jPvAAl3u39cZJMJ9F0Ixm8H0ezlGafV5/k2Swd
+          HnZ9955f96yRTuPxbu+YOTXv5b73Kht6dISiM7tP4hGxvD8W5fU43jjBX6E0efVKQUbWogh5DSzh
+          Kzqfe+pd1Wt8NSXGJh7WFylzfQVhq1fQTo7jk2xqDcNDEdtEpHad6D1dUu47M5XO/ZHGoXxDW3T4
+          urfR0gftSnwG9nluL/qr8OXed6+ff7t/VO/r8cacyT6+s77u9d4Qp8CyRk9Y90iY+4lshEd832me
+          XRb06/r6LweI7w/3f/gcgHixf7D33cuTz9HVs6M3PxzvPXu539rZMCoj0xGfYuqKUB99LN8AoF78
+          9YQkJsgeNNfqxG78nExv2/RqnRobpoMEg1v38/XPn6GbD+kwJO7k9rOgxp9lNZ8wiWxQxuV6UZI4
+          Pln9FB6fRyRVlxmJxEkBPYjnQzNAh6+AWiEa86Esgl/0DB6TdNK6/BX7eP+KTuDh246D8xkP9G+H
+          5D/CIXm8oe92xbZsWF0Sh7WhWawna/8s/v+n6EO0AdZNKSs3tPppYy8fnCcf4iK8KD83/7/16MFW
+          Xf//9YPNr3/j/38V/T/rf2KvTUW9tkYCOfGXXsXVC1V7jp9XZf11Gpfhd3lSe+yqGWBa/JAM4zx8
+          oZ5CraubNAT+8L/wD/2+qXoINSkII0HRvAhx16Q/h8f48Re7e+B3mGTh83FWxFBq1l+0fXyYTmfl
+          MZ/11aZBZDf8SzJVR2c/LfPrW3VgT8pSnYRXP4cv/0Kcd3N+euoviJTZr9c2vvzS2/Po9yFW701I
+          UlHDhdD979OMvA9JAW04c8+0PTlUb0lKI9Om7VDbcpanSoPKjDa034NoPD4lTMLVX5TZ1IujfHwd
+          el9urIEa5iPYVQAIb9szwFcKvdEsFeOLH2x7L5OifCwGiyfmbZH8LG9fRVP1su+9zOxP1OT903E2
+          uNj2fHS47elvhVJvexYsiAV54j3LsnEcpdAjMWj+HMdTsWUQUTiLYQmYXsOeEXlf/7xxtHekoUXf
+          eMOkuIB9JCk94nXoy4Qa+DAm4EM6HjnR+3gY0Ldj6iQlCJBQq40oDJvsFPYbmiZOoEBjmicfiGfw
+          PhBRuoiv9RqeerteOhuPzYKHSe4PyisCp5zFvjfLk22Pjh/BiS0llX4fhjOo7/EYjYgrIcx7keR9
+          rycLtawF/HE2oM/tAxpiq49ZkqQh0AkPWDVTlhVo7lmVTutUKmTsHttY6GKNlUUpj9eH2WU6zqIh
+          AY1Rjc1EwKUC1i3sH8Cagm0k5jH/gO9YriNUHA/tDQqduRdsQejdpdn9/e5HWsnTcBynZ+W5H9yY
+          B1FRknCcjGjL6HFlI0pGng872B22QXh//7t3h4E2JEhF4WmS9gKikoSjhI51G9WAUIn3JNjxhuHk
+          gnaIvnI+wfzKjLafZujMDKa5zZdud9gnobdHcZGNCQ5hRjKuhcM+duDOnXBGR/GjlwCjG7PNZmX1
+          faA+zbz1JuODyZ3ORjS1Z9dlvJfn0bW/5RXnY2/rES0JCDnE0ditzxT/Ls+xhz60EHW42P3DMpKE
+          oD8+DQWrMgE89R57mwGJ53F00doyCy/zpIzRpO9t9r0UEMZU7tGhaG3xNs/OmJjCgJeXfu+IhoSR
+          Q51fmB2eE+pYj/7xr//mAT1w+M9z7/7mjffqWc+75/mYo+zaE8yzB4Jw96M8sT+NQRJ7vaDfOiWN
+          XlZPPkYLy+yAzkFJSLAhyBHQvsf5ID5M/U1a8NYokK5x/oNG3zfOk5va32IzZ9K020QOjX5rnZP0
+          fv973Z7OhEyvZX8r3G+8imFz83sgDpp4DrIZneA0K73TmC8jNo+N4zImQunf/TialMdENHwZOLgR
+          gOunMombIPQOS28SXRMpSMZjdKVJCtP8TCzUTFuIkAyjCQhG2HNn6EILR59P/lrzvbr4hpbhEXTY
+          rNxQYhg051HacBhjqUfxYJYXBI7xtS9GX0Xi2fC1hr5x3BX30E3r+VaVHcFmnwOc9hH+Rha8Ojkp
+          5Zyiw8BaMNhlIn9EDqL8zDvFpUpL3vVOSeQdJjAe0u1G7dHuXVL+6O3SO/xCiI5Z+bozBdDL8zi1
+          MEp1v3n1FR30zauHz/iiVmxUy71Tff+Qv/8K/3/1AP8/eMht5dZym+O66p3sHz/sbdNtdAqlhTjC
+          eH4YF9MN+m+C/8YtAz34Gp1/vYf/nz3H/3sH+P8+P996LoOC91w45fto8WiL++Pf7/PvW9z35tfc
+          01GUd/TDRIG+UCfsu7SYTUUdbE4aLKNR6fnmzbZHTGWfuJm+R/sXqNNwoxkgkMkCnxRyH9ften0Q
+          esI3f5aOk4tYGM0ZnT/wqoF3Ttf8mK78F/FoTJf9o4d87z+j3bu/44FXNQylP4nLc+I+t2iPAP1h
+          DA+XIWFNHjNrpPmgAd3Vhb3/bafAc45BxUKNsRTCTcVE+/wfc1uh4p8EpBVJDJwemLOEwsoHhoMd
+          V/M/TN+eXxcku4/fgC0Oo+I4/tssJh6P7lgR/OkI3KEzlBR0+onJg6ZI8B7OMzlJQDbjq9xa6Ldw
+          Ek3l9DELdEOnBjyxotFOW8UWW20JVNkgwcyrHogjn0RXb0Y+PUALQq2X7KpVXyiogU9Mc01kCRy2
+          mQarHdg4PItTqPbeznJYnp/RODDx7KeD/Jq9D/zAwlLtwrJOcmAZDyxkLRgRcCtUeEyXQczLIHJv
+          UW7sxCBKga08R8g5fszD4NVZXNpkLbaOTKjwjojS1kN8P/55EtGK1aeq9VF06XbQp5YA3lKHDzin
+          Dwz0jWpILEV+vXHWRYdufcqy07mSyOAKl+LkCv7STQb5IzSHtYkKdfFHCz5dAo+1f3D58sGuaywK
+          FCZoZhH8wB3u2Jc59wm36CtFv21PHGdOA8h55uCovzSh2XOI7jQZXBDgCFaQPOkW3/ZK9gcTYKSG
+          np0T6w+eLUvlZm8hFRa5twmBSznsN0tQkRXlIbtpqnz1mN3nP+CFJ+vGVcNcGNyXUuwPs8NhMTst
+          eAP3RkRIXpKw4n8RftEHbxmOs0viDSOGLEGuiNk3Bx3Re7q15MeYKBn1KBzpXRloPvlRXj54MJfU
+          EHlSn4Gy+C1STBB8DvxcnWERFDUIaljhVqT8aK48OvxfFM7ltO3d906JUym0WbxvHlR+8Z7Q0q8a
+          L/o4x+K2mkeX0jFUyg6qYiou5aFvHULb5wG2Wc1RI8EWs+dwen8QwNeUPug5YFbugJjLa/88MM2J
+          XYM3mH/+7qsfxUGWIIMbe/Pq4CAA3fHp3aO2dxALvzGffN31CUmO+ptvur65/zCw+cGaSgvT7ytg
+          n797+GOfZ810pHbubY5rNSah+BkOlUZbuDSb0HGUip81mzCHFajf8/PO3HIddlz+6tpvG+Gz3BrV
+          5AJ1WcT2xAL4ApdJOot32m4Sat24rQOlC1jmaqH2tZvlaO/ooajcWBcHfiIWVgQ3TO5NZuMyoQs3
+          L+lYGS2d6OeSlE2Xov7DPTOi+ybO1ZFmSVWrPFvZVItXXw0DCc20fN6OdzBWEX83LjIC8tBW3zBQ
+          h51aqQ5NFDFN1JEo10MFBcH7YUiwUbdchfB07IKasDyISkgC5bZ3cp5nl9DotqkGhm3ybuOrEl14
+          h+NxfBaNCQRlvH81iIV97D2PUt5GmSarV336j0S9amex19XWzuEpadfvfiyJEysKAvRNpz7ARj6b
+          bOfxmDGPgBpeRuOLk2z6gjgWm+/no8k6WOuYU7uopCmdZD41DQjK5TnUU+OIhIYv/vpXut+/2Pgi
+          mMvxVzSGZzGPZvAHFU34AdKc0ksMoY6gG7K6t38B2pCCNvAkAmvUNAiTtKmPtAhDuiJ3WV3kL+Gd
+          P87AHdJVHInfs+j/SGYhKZhO7bUImxktZYcP+neHdAdllwVr8YnPxEXOmkPa32icndlqeq1UVEv9
+          4/cZdnQsuvoiSQEmAyf9k3V7TxlU36W0MkeRbyv7oZOudKuCaay7LJNybNkyhnEZJePq71EuLgvb
+          aijVfx/bMKB2aoO013tQswukdOxMNAGdUBz9k2QSv0rGxBJaJ5X3iPuEThDN1mXOj71vNs1+bWxA
+          M/tF6Y3GGYkyCsRKt5/NCjqmBdR5symsAYXpXa2euq3UJATRp4QuH7KLWICgF18tulJf/ObJ+4va
+          /w8ykkxvZfxfaP+//2DzwcOa/f/Ro63f/H///dn/z/Joep4MivBZUtLF1jD069iFfJYiOgqs3ffR
+          eBYv/HAyK8E/8MX/ChLmSi2W+LyozQR29MsHg3BIy96XmAPbeH4F13cwQgXs8Frw56iiOD+ImLNd
+          W2NPIeH8DviOY2EiH1TEmXm7onQfCFNpKLM8pKsgyxHJwfr0tTXEi5T85k97r/bfq/AeCSz6Q/iA
+          g/iI2Gqv4/gsTocRMXX7w4Sd3EZJil7Bo4kxgS7PvfJlDGXCefTBulDSGGph+Suo7otKyoxoVDQJ
+          i+k4YVWEpaVsxFVuejc7YksEPae+l262ZpiHBHfxpoe9GyvtZaSUl6eih4OsgUGuaJAIePYm36fb
+          zU/wwkzhmu0SbW9xm13BpHVtrq4r74l37domYM7Uxhgo5N4Sz+ZPDbCo92kLC6cXjF9dnvB1Vu5P
+          puU1WK7wJ+JCTjLpyu9tuLodQgDGKxIihoxW2bSGROPorFD+Em+jJH/sMh5PnqjPoNOb+9lazVp4
+          xp4Tth+G9HSRDHVHmNSTwHLfGGTEuJMAkc0I1V+pkxmbDgB1nkiofUw+evQpzLcJoldzwnTaE4xg
+          fUGvrH4rfQ4GjGlGPp1p1yXEzPc8KgzL6nCpdfTWi+agQEBUYah/QYvmljTIuws2Yn2gGdxrCC6y
+          LtVqRAItt6IJ+KMArYow/tuMGC+/x977sDyLkbytM8Be9WUdV5sAaNVWsy1Dz5wvDSCGRdA0YwL/
+          s6mZ25tcz4uOQxil19wLjcMaxFyZ9PCkshcpwveWVZm+1nXWaF9c1KlhPII/pfuQyBSdktRBVCBZ
+          B5qqTbNxm+mvwlRa9oGcjlbkwCcJjMHVOa4wuaS5+aM5rTtRy9s1U9TLEdQWKifbwg9kc3gQvT1P
+          6YIiij8EJVQQIhArCP8pz2bTDgCXTVhKQL+Gi2zPk0B3dlzGXX3B8esUogZA/1SenWFs0xnPpOoL
+          PKHE6HKPOWFTkuMyaW4JjWp6wRTUc6yZ76to3Nx7q5cn7qBviWnxVXsafdueir5O41Fy5a6PpWeX
+          tAVrjkpWcQIhzpKf2nTe17fR4Jx4gNcZIbYSn/lSI8KuNtl6n5BI5eO4RsVT3TXRfftKKKMzxDXr
+          c5ga4tA1LXdWMs/AxjO/tiQx6tCmqk6eBs72UCfxU2WBiMdar+THY4GBBHboe1uc/linCBLkVV8x
+          R2O+48Bp9VlgaGPW964CW3MlPNMV7ue9ktZ0OkMCAAlBhsap/oZgWhJXIwkpIN82P9FcFE2lyWEY
+          YTGkO0auYRdWwMYaqPgotAOJr2YCgTsD0T1kAEYy4lGoUW8PAWM3fct6qCFHVOCFDnK+7lkcktst
+          vusFSp/rvvoAvhbx0m3dE4SX6p63ubX7Ahx2R/e4r5bpXtlROnqxg7x79eMEIPOV56j8sVuPT54I
+          Jp88Cdk5NR76/NP4TPYVkfNPxCfDnBs2YcvHT22uS98EvagY0JTo6x7zAKw4fIadRIc+684sO5xc
+          isDPtlYvzOP57bVFGaEzmulkCYSJm08CyXZl7Akcmmcx67llqHTllTCNLw/hfCpeCvRX7Ts/EIkH
+          Q7lqusC4cGtZSd+XctuAJ1ZvMDG5c2osVjlkdhk0rIdbC2DJkykfFeHWh9AAlcOn8o3Bimvchpaa
+          VnEwmvGY1nAt5bwnfT3UUA3D6Pc0hEb+uVgV6Q8SnWjRhhq4TMawNDPh9C4yjaetw4G+mJmXCz7s
+          SVKGaNzrGFDzD+hEjoh60rMm656Tadnm0smnZ1rWAMrHLNAEjYg0DLn6q+Unzxy5uwK5bBTk+Q8a
+          yP1EvTQXP3Nq1UKFzlmrrFm1WqclZMvaWrWz9empsZn5a64RCnl76KDm6ceskH9WYTosNsKbnXXg
+          YP25ALea1Jnab2HZemZPpgUIwbTQu8/vDXlVZ46poqF806J+EeV8JQe2kdG7qS9PPPqIJSzcdTGb
+          WHQsi9GqkLkrptHZZ/UqU5iCa57hZK3wjFd4plfIsDULFEi76zu73foM8wmTiNp+ccDHCq0JFTyh
+          Qk/I+shMi+HkzqpYdVZrlVOu4XyrqVkPAbRDlW9JHY/PQBiWJwjqKJfuWTZCuCbClgggLdRKtCyg
+          lnCgaYFsRt9evrHcvsjZYgebgQI/sclTOquEm4xmnPemr9NtUS9FDPUA1F35DH6HMAKK02+q5EP2
+          a2EjjiU+/JD8HOWiVhmM2qSHLiHPEh5r8qEoRJmdxi7Qq4qbYHlEPJx2vYam8/EJXU/j+DFxq7Cu
+          yX8kHqkhnxicyb3BLPdOrz1X9elvWg4d8IsihGQLIL5+sosVhgx0VpyJ71iSJpwxaZazju6q/F5O
+          sb++pXzy76CrAB4x4Ava3AVh+/Rn05NMNJbbHkturTKzI4k+qfEFLAdXgBGY1LrwFYcwOM+KOK0+
+          fslOS6Zry1rFakQ/YX0MsSIVEGCKOiSsv2qayrHuBCDDqtriEfBBESqK97Qpxu8aG5v2eXBzgYUi
+          TWsdF0+DkIIIHk30jAliqO6C5jdT+mbadsljVoJe7wSVsGz0OE0CVlypoAwNvXvEhu0obRfxeHsk
+          H01DrTPhE96wglsnXraLCIT0Vrsj+e1e6QPWxjOcMQVPlKDaQCUFUT8xTcx+vUt+bAM4DQG3CIb6
+          HQX1Rrc2YsNtQyPqIacLqxTN7NJxz9vSEr5zYAKGr5lhZZlOTCyc26DFZQBZ8paeyDpNBIEMJxlC
+          RBYOvr5lgZ/g8ZoWzcffXj0d9MB7XCcFVqu3NENuZU+VW9Fx2KzC9KTzNsqBjztIh26NAEFuXR8k
+          LKOL+HAkdw8GhEJMLiMZiPUNLTRIj+FSlESI344iL1q1yzhT3YQ2hi06lw0qUJ1TE/TAOlM5h+y3
+          iBSZf46vffdMsm/Djd7HP7ojNmPFOFHfrkUWKgOKKCob+l19V9DVCGkKHZhGIAa9I3Uz9xDdZp7B
+          0R/MgDw+4+751TFfsUQkei2RRZJahidYa7B/RULn+PpNGnd0WL7KiHbT6yaF5U61gQfxaLQWwDmG
+          HYiJ2Y5annrBG2AvctSIg+KO6esUN6TSbf/+99jIlSfOSnm8D9rcndij2EBezfqATRw8LFGrHnFn
+          3xW4v3owe8xfyqwe4OVeKdSq9aY4ZQGi+1agD2j5PMl30+THxrQablCVhjw7OzO0Gl2qX6aaeruH
+          8axOzeWsvTtLfpQDinynjRnKq0vOgalWcWHusrUq6BBqHNmi+l40t7PfxD0AqbmFzcNdGaVaQUqH
+          +sdaVklH7KwWoIhH52Gg2wyLZlWQs9Tm1tsnE8tw32plkj02um7fV3Df+1fTMWgWQfVaYrrFGYg5
+          cG8QwannNPai4QcokIbeNYxLdHVxyBotC577DX48jxH9wPy30RjlGaHYBOHcOrS5zhBaFBvXQ50F
+          qdCJ3hribTF2wmYoGejNyBhgfKbnQZ2g68DU5r4Pshlf0e6u06j2vjuJQh0ywIfJ6Vhb1mrku/P0
+          GSxvw9I5lIvOthodvlrofwvY0Ht+niG3aSyfchiFSOlgP/7au/vxTKJS/trrLR7QIoX1AR+740Wl
+          h7Ss5ScPaA4uj/KkMcokW3UQfVCMT163J6g5KvoKFSFZeQcr7loGNg8tKd9kT/YRG5ebULhLmiTb
+          f9a19cJDHEHgnJo8Lkjk9WvGG/fgaFlEZmI47xo/23aatLROXLA0DhG/90rzGrzMVqMzGltrdGxb
+          XbZOt29l97xx4xD3OQc1C/BQywk9YgH9i6ICKhGY4gK5fWcl5xVgB0+iVKBT4yyDwD2bimc3/STu
+          OhVSBIBaMn+orCScYsJyW7DEd3grVLI7Ym4eG9FU8lozgKt7QrRJlehiezLsNCRBsJqt4h9oD5Px
+          sLIp2w4SAuO6m4ThfpytWdTO1uvQk998Kn/z/6z8P+30kyu7gc71/9x68Ojho69d/8/7m1uPHv7m
+          //m/Wv4n/fqQfyyXHSrMipDtj63PEU5ef2ESSBEdRoGBouH8qfOshUiYTtxAWmrU7f7UOIzGk3hy
+          iqhLyfZ6kOW68RHfwYu7KGJth+r+Vu5zhhhc2UN3jOfqcdHp1zpCDlp2hQgPoY5e5kPoX844ee0y
+          Xw/GxPTaObLmfZwUEkFwmL6I8gvObrtMs3F0TTdN+OVy3/58Hb6k/55n49kkXboJvHCK1b7W6pgl
+          GhXn0TQOnyf5gPgC/L58oyM8iIkHydM4n99Wp5EPOY18iNTExbIfE3Mzjofh3nC4YovnqKewYpsX
+          HOq1YiO4LK/Y5Ntssuoof46vT7MoH+7leXaJiK1Paf/ddMXW4NpXbHIUj4hKnK/Y6ocoR+mMFVt1
+          ktJGMYQ5h1X72nd/MUvCvXFylk7aaKP1kcrNlc/7ZphHl2E0np5HC78iUjad95EJayDSkuVLfRkV
+          THYXxEFQC12fInyJwmrtF6fTAO+JWNA1ekD//RAnZ+eLv+es4uEJ/crwXeH7NyRpoW7NvCazlESG
+          4dxlkhA7zC7DFxw0t/SHb6syc/Um42QUD66JqtLRUb8t8w0Jjmn55pQTxpmdlFIomAbdfoTncUHj
+          FxwbEefFnK8kjfqcD6B00nuqLMw2p4xsh3UWxJgr7PjfJCUQwUPMNRAr+yZxTU98zllkwlqzXDv6
+          egWUdAhI7sp7zgHN56KLS2ct2UOy9LlUXyqiD8pkTzIzz2DbEybsqa1fLWZTJGPobuVGDTbfQ6fD
+          2cxM5IDkzLVyJBkeigRWCXJhrgJ/zTidpK+JBNOwV9EVJwdjz4u96dSHF13fwNU2a960QuA1nOMw
+          npoKK7NjV5+t113/1rIqtSxHjffH49mUU8L4vRf7b4/2n++dHL553WsmHDJ96Ck4sBedd/JUJaqu
+          q72lRbj3HJ2/RzZ6TivyNESskvHwUFAJo6FyrpzTBzJhqz7O4vItYWA8BoLuIxpbUFM12P9vJ0d7
+          749Pjvb3XgW3Hstk3W4blH0fcSpuMToM3e4EakqnV+qO8/57NsMuZDlygXqqKIq3df9eH7loksG1
+          9zrLh8nAm0Y0TMnZQNkDWicMKVjN9Ec++6wVZZWThca+EpW2Pesjz6/ChC3d06BEkJN9feg43crv
+          g5huGBeaXLjlcSS5+psJnFj60vWjwuMXf35/+PoEZtgHWzolDfoPvOF1Gk2SAfrmi/J4IEspr1SC
+          QvXBS1xZ9S/McDxX6ndY64aOwAQBbLseP/WRIOQPz58/298L+gTgty2vNzcfPHj4LOB0Pnj5XMyu
+          ce58tXXwcO/Ro5oboumwvc3zF/uPDr6GuxKrJzu/e/DVw72vvuYJHs//8sXm/lcHD2uzqCQyd8ab
+          W4+2sK5CSF37Sxqy5fX+5v6j/WdBM1HVuL4rbQC///zR3jcvFkHUQGcBFDc3t/bv79fWXCwHp8UQ
+          3XxGve85bpr6BOszZhYLAyv/wp5nfK3s6t/Y/+yPb6blYervXxGFT7gC1Vh39mBvmmxv8+UeNM40
+          rho324cmOSYQjhX2oFT2oZ6c5ZykQZQNRKnoNlM1Y+RA3VSuY3k8KtyPkRsJxSJxqQ/f0nu6/elu
+          hT9grw+3kRvjMwa6T4PDb8zqoOZCxkNwjyoaEa2oJ76jmZb61Mf2NruHB3b3k2xYzO+bVhqOOZ+F
+          3Q5RBbMFLXs9u8XprLie/73yvaqaIJfD3CaPkdLh6RNfeBFpCM5QNnh/NMI9bNNjJ7csEhTQvnz0
+          aNeHfW/EinoMucvf+OqxfeNkqXQPPqbej8r9WWEzlnCZ/Dx/Bcp70PJr7FcxUn2knXlSWyC6pS7m
+          w9LBIeZ+585COSu2jKS41NVRUDtFL4OFxUUR/yWZLthr+CdSB30nAqwNOmxpyifzu6MD29KUTWVv
+          RrdpKikxbtdW11u95dBRcfFWSRO3HJzA9WZ0q7GRfuWE0KdY8XCX1Gb+eMq9oDlkPEzK2wHqbzOu
+          jbs81SoWHR33pJXJ4GKFz5M0Wf1gUaMlDhXdOypoaberc1c6rRpiR1OrmY9Loi+w6zNE6k5Cf6Ov
+          +bUOybEj4fWH6KUyMP8tTAodS8+ObGzitxsaLzz/b+aTrFz0ieLg53zVdMAta/4dymTb1UXdN03J
+          KggsVOKdgpG4N4zD1kgyOJGgAvHNjnd//mfilbpTcYKWKGyFIwgBqe9bIEF4/BJe7fJMGh6T+CyX
+          JDCD7vlJlM6isSYluzbxt0gkHEEWsgz4am8wgLwcLH01c7YKzmkIoSkqmtoX59PsFJNs1x3RrN73
+          vVhLQKyyMF+G/GlIEuvR/vF3r/YDWdSuV5+5tdOw8lQKK5JH9Ug+TSNo5RDcJgSv7EPstGpsY5Ei
+          kaxzYo/x6DTKv82KkgHsntVBxtWydYPnWrd1jBeW9PjBVDa2+s5n6XNo0QTVwJUqc6JiZUV45yeH
+          6SjzrS9ec/q/zSC0a5rfSK4OidmtIlq0CkXZ5IZq94WH1FkH5S9JsvFsHKUXwBuGRwiCpMFgWt20
+          dam45b4QG/H//gjF2ySOClS1YH5XR6cMvdN4hDLinHbNu4QOLiehJR9avry6+IZmxJ9ua+dfd2xH
+          ZcbDG2cxPsCP4RZdV/dY+kffUmmGh2+Cxva49NPp1nIO4WMsi0WpgKSsRwRoUqywfVylqqtnzWuH
+          rb0EZiwNaLTSZsaEcJWV4dQl6fAtdfciyf0Ze9QJPy0Y9UJChgwX0XRrTTKfC3lqr0Rk2jnU+0z3
+          pc6DxyoaYg7qZGd8OlbundwNe61V7dk/TvN3d7Tys/cdPxqq0hHc0HTK8k7N4dWWLuSmoGEBD3so
+          eMSpPxGKvGMNg1f8h36RJm4780B9oEq/y0v+Q72gLbHeyF/ySt8yvR+y/IJjoW/geYuc9/TXP/71
+          3zTzUalVQWqUrr2G37gvxFS+DaA7yfOsdPoQJXfno0zj1nZQqLNgCRKeS2LCYEfNBIjf+n3vLu0G
+          sktOxN0QWb4n4jzHZ+1G+wviseYY5IUK6SyCgCuOAKERE0GkjGiwPhc9725SEjg5DLfXUgmkynSk
+          DkXVB/YSmcoxvcTKfjnXu7xxzHc0VvI52tH4iC3ZqfBbPwAze8/1GRQI6gVNusKZ+DA1DlAFNCeT
+          Er2ZTyww//Oo4Ez9HIhYkaKbwJZ96hs7zwV0Bu9D76fsFD6msLBYujxTysgkkxSr1w47SWOWGpXO
+          srjwVM5ZtSdIjO64fpY0w3oSSIcauVlsarRjx1VJSBrF2x7Hz3HU9HFaGs//2XhdQ+MGKhyQQFWc
+          c/SpOgPbvJ+oUqW5Jt5nn7MSizMtPkjjS/ZVHtJLeNerTGLsNZ/HhPfXnqTOHUrKbM6Nn25kJGdz
+          Ug5vEOXsQQxTlutjT7weMsUQyex7Q10pBnWp3Usr83arY2sYE6umEkA003cC+IHMLRTGHgoOKJs5
+          jxKutpDiJ29p2paL6k4WxnLXBNxZEZfq7sGoPExfB1fGUnoOvhHWVugo2xeJrVntdOPyOzyuQtSR
+          1okxTvJYmRRn9ZTLs+oa/7iwbhfw9S1QoWA5h7bjrSlv7s+a9aKUSevg5d6f3v/paO/1CckZey/e
+          f3d0+P7t/tGrw2POBZjlLR/+cHR4sl/70r0q5pxvO4nIqgyYJNo4jcF93bREwcBwejxjuUhCAEdF
+          CEUMso7M6ornWVjqzHhBEKJOKhdJ0jw0Ye1ORYxMWrL6PxrxIErG4Ns/Vp+vSDDqIhZwrLowFuMZ
+          8Onoh//tsKhrAyu1bcceWjoB2sb260X3EpZ0VRJfiZjKXjsF1ltymCb/vrbjnwN+Ue51gF6pC22w
+          N+Sg0xiM6EwlrP+4WIxdWmBpq8H3lu68KL+NXICkgazqWJVOcSUMzqg0C1yFQ0vIqIxhcKLGJiRI
+          xs93LTq2bsmZypfvtQTltVNcP74iYXuCAPxVuSt9T3MFAGw5TQDzDgf16BbOlNOECErmsTdbAbRF
+          06AuN1tJLRYUINQLQlZxO9mGNaM+gt455kqnVB1xkob4CqIiA6HRZSd/1io/XIYSg966QbL52CVZ
+          bN+7DHV4ld433inY3kxs6qX+eLZMwQDwhcxjO+lMkPgcDJ8pIqvNY9sebTJxfgO43Pa94z8f7+vf
+          TTEZVRDKLh9bBfDDRavl0IrvhrozKyyu6KyKnLvOZjknH1W5iT2JD+rtuGn454oWn/14S5zoLU44
+          Q+4oyyZLnXA1zJ0W8Kh3q0m9Srmn1tWMCkV47eprgoWTAFxkaWGtyjmeLx0je9vBaSye5uLI0pKc
+          wVqdNqwiDp1oB+auDoe6J4K5fJI0/TRe/BWKetAJ1Dx5oe7uonF5F5VJKKjvi+sOw5831HHK4MWe
+          ajOVvBVdcRPrJRzJZkXQrek0XmdagcyZZfTDBsDdno3L4k7lvSZFRqsLBYm/URgZ5g7tEfq3WTzj
+          OEcWFTXBAbVBETF6mqFqTd+Loee9jJJS6tvgzbUqdqHV2cQXty0LqNQHVexrvOhb2pO+WYhatVs5
+          gvGQVTU/a1KEPw2CVY9shUz1VHfuQk9RPv1STCR7pb8ZOL6XahStYMA1R6jsBILvjWMojwEGv+Yp
+          RucTbB2ifmO28ny0zkUrFagnnmO1CzeEy7XfYwKPUn/DWGog9hq56lhLtNty3Uv4i/8BftODaAyP
+          yPRMcsvuetZfIV8pw2fX/jfhcBp0cQ4yoZPzpJDag9MpoRrrpJC7Xa4iX2WZP+ZMit7+VYlUIXkQ
+          ymuU6XaqNp5ecxJLdKbiclXvxbmp/HuZ5RdStCdCzC7qwAzyiPUohJOneXZB956kbixC8ciMUlXq
+          V2N3wr7gnlFQ4IFVSZjDrMMWRWm17h+IoFEj5FxAjPJZPNzuIUfZNW+X406GYPSM/f+vQ97PY7qO
+          x+2dg65WJhUZ6h//+v+wXmuJ7k+z4bX03iHYSo8vGHk4zB26yFMg59mMq7RKWXoVCn2ZoygOMVin
+          RAJQt0haFeFKc+muas1+do0+LO87FCEnKS5eWLzaHUP5lTyblSUbHgWS8qefpc8RoNZ6GvXdxPYy
+          BSylSga1u4yu25JXDuWYrz5cgwVgJgQkm2t5QfKqOC49jwGc4Tn2pmdP8zk/lunZNwyRTUO9DCvK
+          NXfthMrgbBUNu4QHpfTGkxZm9jNOuGaHrHqfx3QLL3rnTl/KELex3/qToIO1VljRakNgh0cuEeR4
+          E/mTMBkGC3yKVr8EtJvYcjTfmNYqA9HTX5TsP1yS7MulWXitxio2R7FFWszFyM4VeD27Sru8CW4C
+          ZcaEyv4efWLK2Q45rdS9TvphjN4coYq0CO4l32MqTzhSEnMi89QfVjP1keivZFX4JSoLh3o2XRcA
+          e70U4gYsri/vgCY/1nJ1tk10UJ+hQPNbFM9en02hWhxYqbo4g8VNOGTxfACFjUw7k6Q5YhDAxMfU
+          gm1HzKqJmcJ3++I3ujS01aNTTCRAVWG2dGm2jzfikqOFSrpvUXIXpoYdY41QFzR/cpaxMUvbpZzI
+          hrDXfQ+scJcscWdwYeXuu7uFLuuTv+vd0b9WlJVFYXlKGPUtAn/UnxpRjs+zS/Os6+Z1uqmikatg
+          pHMO2DtM/UmEsI3732zOO4biPkbip6YSR3wYhw3TcbAaW7IMgJWLf9dK9dQKX02kAmX5OXiYlqXz
+          AR8avMuTM87j6jdO/KrQmEt6loYUewXxLuNrveFTom84dGUGjmDrvmz3nDXXKJ0hIg4wiLqw9A+F
+          ncAl7H0uqIsIrLZWT+Qivi5M5clfYqt52ahEWheA598LNlAOmBTpG2uIPsfxqJSUu4ImPMDnx5F/
+          Ap7Y5w+r+gX2pP3NzS/EpbvsEvhE33FA0q4alr25YhcnxJNOmCluMlSfxMzXmbj5rPiaNmpo9lMH
+          cSimUeIL10zkq/ZtJxYBP9RXWfpWD89e7DBh7liO8CaVIPPwKHQqckfzg8o/M5+l295JVFwczVKJ
+          lOK4FM4DKR4k9IdGBvEdw9j2+UOZjmR03ZPoPMcl73t+o6ZPmwTHQHGSDKpFCAAtbOkRpBQX2ezy
+          rXpX75SrHsPnoo81wVYwKTg5lhFJ8PfN3HFhBUOTwzSxuzfenWII66vMfvSVUkP7EeJL4cT/5caX
+          nO6cJ9EYqxqpzLMZ5+xrLvBEXtGuZWV9kWZ985ahPek+2uKPxC60Sj/Io/FCeBM9Xj3o8Tj6ILiE
+          VOZ9L8364nauIiKM2tdRzS/hXiUSpRqcxa2+PUQA9/OG103z1GYpNL4vdVwVT63pY4yETVU4vYrE
+          bgY+c/CTqmjCTmXSsEApZL93XpZT7PBYcX/4u9je2LhLJz5onVp1EB1o1YhDpb3skFBVHSpAopnV
+          t5idFszD70Fp+xLV36Qo9C1FVMe5bRkplcEK3yI1tV9WRH20WEStvCkrr+u7HxmEdd/J0Nsbcv7/
+          CdgmtmnBtOlxTQaWISO9Onz0tEMwlL5/efXdnie8F+TAt5a/AyaKefO0+QkJZ5xDQZvl+p9Z1PpM
+          6rm15eS0VpA0ELX1qwWuS8t5xbM57TodqPEsn/++d0zPmYZ8v3eyP491qi4jxx2RXRZPkELTpOfg
+          qIBoDLeDa0HAOOwty3gFjYPZkExvy/i0kIbAFj9Qi7uF+amC/Trp25JalVsp2xBkuBwlUx7qS2nb
+          DK359622iQpTw/42mpvgU1n3CvjCvZsgAHOsLK9Ni3c3npsO/65afw7u3caKJRh4K1r2U5GYLfpy
+          hgZudA0/vZFEr8+um2jgRo8Qxaj3cWeVTlY/TDpceLnT9Fy3sOIbVmANltCUPZivKXMUASdKtVyx
+          BGPE3zG02L7N6Y4kP/Mvd112qQjdmdrnk6gCfoZcspH4lxlhrh2j+fmUFr+isoIdSSQqo0uXxdn3
+          P51vunQzI6Nc6jhoiyFp3QqQau9uCgQeu4aDHoqJ6lxr7Lem/whfEa8/mywDpEcLFX+szBnXL5jP
+          rNdZBSeF6hBS8i//+2GlLOsXR0sZ5tZ4SZf1f0Cs/Hw6xfpFZjEA2JmW+18l6Wi9+1e7SHW6j6Uu
+          Ubk2P++l+WjpS1NZcTU36MZJ9z7gVtfvRL/+lkto+70PveDG+//+X881765kLabWTXtx1d+vbdr6
+          HGat+YdP60BgAVxEpbrM3ktaDN9oi3eLYVy7hGuS0tfGpCFS1hlF+//K1rRfwIz1ebb2lyJ5dZKz
+          mNwdD6IR/LorekbQfRblDaJzkk33pnjjN+ZuSFnrWoVKzcFY5fYoboSIQ1QJIubccc9oxsGCDl/G
+          ZzFniGPdN0o8EwHiknk2lbMcSYgQfbirq5Fr+rMEbnBo/hyHv5bNbh4TydhZ8C4ihXeba5ll4pGq
+          QoH62Oek36Hy+DYJm/tej79vk6LNcURvZm9VDzgl6gmn1Cv8gc6y93zhEVZ5Ca1gEGvo04yWNWnD
+          r9fRh+SMU6DjbRNbnPeHdLJ9KSjFhVORsmyX7hOxiRn7GZ4ihUXfQ0JrA9sauJAvXMUf4FOVosGc
+          HMJIhmBwqylttU1pa9GUQKLmTOml0Vw3J3bTBvbCyvPC/diJX3x+q0kVe51T9xbbU+czNLWjn4H5
+          4zzLk5+BJZjoFrOWfW8Fdb8m5+7Ov4iKc86sXmli4Ucs5sW+J17nWSrGf16ZCvPVRjsDwyzVzopt
+          hKorIsAu0/aXZKp73Tt6/u3h9/vvT/772/3jGvyDRiTFHU4A9Pvfm/i4O5XreneCVWKOnmPh9VTG
+          PyTD8twHX4SyADThZq0A/z5zfnNOPHo2h31Af6x+zkvsrZ2As5UtOcoum4jTQA+d9x3IoX8Pn3MF
+          z+/VN+Pr+bagA8CYsCKGRSQbjULqaZxd4n+lDo0kvhjuzyaPiesjjgfsey5+0FwETWxFws3O8W8z
+          a7zkG8rfGgUryUatHR/jcOQV/C5568Vlv7XBAWfsP0FNpyVtKzqAtdVuqi8SbTl9tfd670/77/fe
+          vn2/9/Ll+4PDl/vH7/eeP98/PraCUW3bak9ldNq++7GW3+kGptT2+7LiWkRh3OpwNy+HAw6dpr+B
+          B2rJ+T2OB3kcp2JoF/pRERUTeKwN/9rqVjf+QyLb4GqICGLTrgBOaFgj5px5CdpF5jw5A56VRMok
+          v/uoMghKB5IMD08LSYQkD02sTI2W9Ctxt4mkWXrChTmZQE5AC7sUEJJuIcUAnfrtGuPkqNnbk9+I
+          U1nG0h/Sklepg4TLWt5WgNZL8VNZWvlUu648AscshUunGFRczpnft/XHV4SAEL4H1pUx2Zl/QShn
+          HSuNXl07oScFVtV1I8CboC0rOQDjSVkBjrHkmsBuJhiOy2a/C/fZKBd2c9s7GGdR+TSQHOfPkHxF
+          glILPire5TnKBUTeGEEiKMcQqQKeCOkCIjPFPI9KTJPo7jDTNBX+siNkD+Wm/LY173nNR2q6zU80
+          qTc+UU31yg3yUOsKEfSgXjTCV3aiN8Sc0WnmTDvKNarvmXdMHN/MygI+v7pCu33R6IIC8y7bb+Q2
+          K0F298fxBwGS0q/V6G4XL3WfPfKFwkODk6SVg/Bn4KPMPTkNVZqf5YR6rUycJ4jRwYyuXqLkBabc
+          Z7MnqoZAsLCKiIT7dMFOi6QlgFvXcp6GGjNbI7etcEwMF+UaeQ5RkjUqs9w3SZX4TONMtYnrLicV
+          tNf97Bpi6V7A+szncEjumsvUTEM5vf1PZS8+fYta9kCuaM+7+5GefultbW4GJDcS6+AHN/95acFZ
+          MCxY+n63KGCdljSEBY55fyoiw7an81DL3auKpRJgn4gcYT6oBIptq+qCJUFstxRjuD2r/o3Lqn9O
+          Fr2eqL+hVQKXt7ibZiZ/h750krTPRbzaMxW00zcna4HSKdnJC3z2fUjh5RWVns68S6hTRpwB4ywu
+          PeaFEctWk+y6cnTwwGqCIYzNyFtxHJ9hbU9b3fa2vxBvoD9VM+uQLZYj0y+j/CxegUpv3YYEgJ5V
+          Uv6nxhYjzu75eTJlLz7NC9/w0ezwvWu2qIyRdsZE70b7/S3siZM8MHstKjViTZEn1IMLWMWevs4k
+          GanaqGAlWeR2UPscsvE8YVBTuK7dmatVFHnDnHfA3N+Szd7pkFkfdcusVQRW/Yjrs6zgrnbj+Tlg
+          1lsm10zLshUJ73sqo5yVtcjSytwRxVIb71BdwCvAbm84/EXAZgJwaaa9z3KHmqMBOXe7lj5yCWb4
+          q81gGSNcs9CLfQMufS81q8DYm8IgksIrjcvJVVfi2qmOnGbdb8PCMFDt6m2OJEhdGUUCMm+BpSRu
+          d+PnBLVZnEdX6/RwHRkLwH5ymuHa+69/dl7z8M4nH9JhmEd5syU9nNtzS6NsUMblOl1kcTQxio8m
+          +mglR4PDIiR9TtgipdOUyqMSSrP0v8oDXyOc4boK5t24Ee03/wH1VPXFWosZRSkPLJZuUPmovYqm
+          j/XAPEMtmD950jeqEhqFE2SqDjqGs7QM0sBhF42GoeXddyoZaOOF5UzXeAftQO2xxncQUA1j7wks
+          69U5WCyI1K+TvvfpF/0b8YQb4hQeJPF46LMPka7mgPV8jwdCz5k4/1d5MZ/sEkrQ1qF0UhorS1iT
+          deII5vPKKqBsjDEy4igeg1Vsc/jyh03aixQC2TROV6hG4jhygliA/RpzcQy/t/ePf/2ff8Fpeh1f
+          xgXiB3rMydGv7sDPsqulXehlhraJkBcvg7/DcfqxTYf2Is+mw+wyfRWnMz++mkYACHaFeuu3O7io
+          gXS4Wcd1KANrFyhVPhlcmwovsgdmI5rreK2tN9b6mAz4Cd2a9RncrHwFOkn1LW8wqwRedtVRTrKm
+          vDHlw+adsQ59kHXc5jT+1nyFI/o5svyswqs81HquhAe6RciIYfUMpdoVJyDisNkz/jouLaZ7wrEZ
+          RW81ZdUKw5q8L5Jx5Ouf+14ecVnUSBEZJUhI2VTJs+xdIs2Q5EKS0qrs3x+lJv8y/T04l5giy5HG
+          O+WjanJPnOTXNAwBmAu0kczBxCm8rRwIXY/W1pW61q8S7vh3hUO3jvmpn50qSbN1lByulI45k9pf
+          zIVrreYJ9yknQjkLsVnoIr5mSiMJqpmGNtLRr5gi5N+BKVf8yUwm7YUeHIanbtePLt/+ZYbbrZX+
+          dOmORBEkJbz92sS3RjKBzfBRtxC2Os8zz6nOuQOEGIq+HtXD/edJPiDsxXYFYZXq319eMccdDS44
+          JumjzTn6k6DNGtWixlvl0mklkOKBaqdoR9b9GdE5VaeKNVZPe0sRkIbG8La+XN3efe0Ss9Igdraq
+          I9xicb4FSKtaTz5V89Ye+fq5PGwXZF/S/1TPbWU21CAYv/rADl9bEMB8y6kYitDTi8EshsaY/Otb
+          SFzXXa4o5/pSaySiN79Q5NHnW8ico8ccjs+5dFlIMHth69VcWZx5eGlgJL6PRtz2J6qcVLBC4Irj
+          W1S/Uj8f8e/M6tUme1XyO5PuRUSlhf/+IcpT1k206gsfzdUXPpxP/Gz6sVQ0qwSwFp9szLsFNa/o
+          8to84LXuAfQkGvxtIMZ7krXZ2WJRUq+5A4kWRy7pTsy/BQ4cxaqqiSrPxfrdJSQvhzFebQO612hS
+          7nz2Zb7gCjZ9q7TYMouck/ztExIXLaMcd3JobntOXWWdULNuM5YKQG0mY0gQKLhwGQ5m+Y5UXCzj
+          qTwZnYX4o3iX/CivkIKWqyuF/NseFCALfGT0lBZ5ysyK+O04KkdZPlE7w1R0rj9MO93dDP/w1SjQ
+          z76VM7wZfvPVyBJy3J3lp3Czy8/iZZ1lth7N9XEB4Fbi01jpFiwVY7WYX+TROSi7Rel1lvS9s6Wj
+          /+5+PKuqxZ1h2nEt/uqYHc57weo5AD9bgI1anH+mOT/2IIdP5bx16gNQstsPVuYzXiPj63lUBOo8
+          sNv7ZQjvunj4TpVbAAzRfxL8qA23C8eBa5v45XPxOBySJIeJ9+9/V4/odv9Okg7gmUCbXwiM94g4
+          LRxFKY12m833ryI4FL9Ju7ovX2Ukd9HruYPMYXnagpAeLsovafM4MvnAO4qGSaauggLU4yPtQCls
+          WgV69yq4I/ANFg7EfDrzgackU3/27i/DhIuVvJvKLz/qOE6uYeITrxMV/OuzpJygZEk7m/VIpHsN
+          0TjFJL5ZJivfUhFPLY5enLJB4pM0hg6yyQS51OEW2/P+8X/8j15VoKCOspx2d5ZGH4iXwQMr3+5S
+          s2BHCC7T1SawqDdIZeM/2Nz8DJ7ty/Ek89/e7qIXLFHVO6q6giYUcMnks58a+PwryC6tIormCdoy
+          oax9DsZcSuwQCacr6sMcSemSNWW+k4cdnrqdE1F9VETB2kXtM+IaisxUXqN3msplmPJvcjY0b+bM
+          odGmh1/0aTqskkrehp+EkzWS2CEj/1CVLBHrATJA3bvM6ULVYSrsn1bM8g9cwAOhuchPxz7U4vQt
+          xcq8bW+ZYoW+RhKIdDmcncHPDmjYMlbBHgNJirXtqexYyIQ4ndHf0J9fK4v5k2BblSTzdqvoshlx
+          kmFbZ6qPAPVLDnC9+8sWPluiYF1bIbT2kmlvEV51fLL37GWzcBptS4PPb4kY4QqZKjC1xYG05nAq
+          te71X5LSsy4YHHO4SNPlwRYPYCh2q6rbtuaXbEZ+LJEq+7Tt10+s+u0qaGm+rdqqeyvnp/o/sLsC
+          9q1g9eZc+0leXq/YpuCqFPOayGKP6Tur7lhfsvwexzixTn/n2eVhUcwWgaE5EWr4TMLGV21ZRpNF
+          jUxJJn2qfGfWKlblGD3N7Ug1f/pEhzmaLvKYsxvOncVmYFVk4ux5Fqo9z0iCIVE8PsYL38oly7nq
+          dlVEHG2y8ZsjtlYe6ux2d6xgShZ2ZSeqQXzsd5+x3InLZ8Xiq4gkqbzwnbd9RhGTR7dWhEiOnRXW
+          JeY8AUa9YOHoFpW2skaZaH3WG2W3ljlZJt8I4LkjcFDlnHbU+alX52IffAa7Vf9oZEBufCdVpTEX
+          QM7681vWR+SFoSrfTS1PmY+YZaK8KDuMSoW5U2JVEzy/vcRqvRibKSE5bwkXaXYJG7catFJosiVr
+          nF0a09UNil6CPDjtadl5BPU1nD/s/GyaybiBsqV8ZfSkCso3qyRlxT+jWtV52ty52UPbb+4kqVqj
+          HtGi9cytNnyNmFDv0g+FTqpwmIIQSRi85qA15yw3cGBodwzSvNvui7+YKOuiiQtzb1IfjdybPL+g
+          WY4UihA/Uc6BP/FP9MM7q5bD6jP1i370k370Ex7F1UkTj6lWymLdB/XqZc4rRf1XP1nsEoaTpbqy
+          ytAvLOd3s9Y6l9ZsRe0Vy6zbzsovXs/zV6UdUNlpCzfLX2uyIp4WQ8V2r9JZtnRH8PwJvTdpXOWz
+          RQ27a5rDhDPy2tl66ZMBm5AaIRoSuPVJqZHED0RmLFG9XWosbAI7rBlXDP2kcsfocMXgn+FJHqWE
+          GfD+CdoVcrZXgMMV4ITPcww4J0INa+DzTDHrehNhBkYPPjtkwAVSKrMRJja+7Z0QLaiKTLQnwbhZ
+          nH1i+VpdbXg4J4eNDRItyLv7das8shrEKm1X4xyoYiSSX1UQeHH+2BMXh0d5NlFWeb0dNwRo9lst
+          JHppMMvZMWxu/ufQQ8f6U5XogOaGadEhmk11XujgF03R3AK5nbbt/JTMzbdnWni7LOpaXS0MMOhy
+          2uvSV9iimJe8zqRU3AyKLA/iKUxilftMxd/sKDb03r3V8zsfVQfws6R3bsXzJXLj/vqxTEYn0xA3
+          dKiWiutzI7bkyFjn7VOymH1i1rI2hZm7IsNHaZf5Fq0dNAiOkkrEDitYSuwIOvINtKEeMWVhD3pg
+          SS5YjhbXnMl7z6r7f61TQSeiInJVgMFydHMNV0reJW7FXGjBxUKFW0Z9XMXSx+lQlWgI4wJxKBy0
+          F3ibstItwtiNDZLIWHL0ovFldF0IFjAVXFuB6tyW2rAST8lImrhEeV8v0Ain7QSH94UYpeMZawE7
+          feodSdFm9NUwnfJjK1XrHUeqrphqTtgNN2mWAyQtPYIq1W/ZyKs+lHJKIdM/izRWXrA3bXFpWgHb
+          EAkXENEuXqPDz+O5lEm/deDdjo4bIfD0mty26DM6MzOyy+8cz16dBWmhJ28janvJ8G82VFgemCsE
+          1u07TYOlDfP3Vw757jTlfz4P3pWdrObjxjeLgjLvflSYIV5UwxglqON0cK2LxksC30+qJNxOOip9
+          Z2fWV5kZm/LufxW0lzL5aHQdN/IHqN/NZ8mHbJ0b8VH1aBZm7H8Df+uAz1unDxAWnq+Yj3kJiM21
+          wS3D5+ynw5WMbx9thfSud8f6y7VA2fvI9SjtOpSLLGTLpPxiBWhyxRcu/ZT7qk3T2tlD9xXE/Qau
+          WmUxZ917I3IRGofeK0IB3KlEqJJU3Tv6Wpc631yBnOWkqARVQ0ZP7yj+kMSXoi/gFIoliplxnKsH
+          It5V79XibA6Sqyq14qpGvspAb3gfQDFM0lHWeU8o5P+//qf3oqIUrALf9tJM04yCOF26Qj57wQLH
+          ZbC62+4o7rA+TRWSDwjbaTXcbBp4a2VMAPPjSWpM2TGLR1Xqc8SzlYj4goHNlMcBNaC+ErtWUz1A
+          aqXAqBVDn266FUpOIOCnXXiOF5WgrQ5Aet/3uMpb3KLRDiSGMm4LTDqNcLAVGY3Sa1t9HcZ/I4AX
+          fqxc5CTvxU0zWumzsy6t7AuQLVZM5ipBSZ8xCMko8tY6k1Z/qnavnYunI1bTuxnPKA0SuEdV+mss
+          cXrtK4KI5HBBXX3dGS/UqRLUiLBilErXOK0KxQW5mv8T3fnePW/rxoSwGLL5ron7Pz4lWirmQahg
+          4vmyIQeFyN2xUswLT+MUdkPu4R//5//dwslZeeqXynxu+lzAtSs/OUak7wiN4gHITocDXMdGlHmU
+          jJfcBmKFlnDfbkj4CVINuE43YpTp06t1JN/sEs3+HF9zqi4ikdnld9O+13tFDb3ZtLfIw65jIo+F
+          B0H6JaalXbO6t/SsXnCeTpkXAtR7tyiXGyx2CoIlSwdnnW57L7P0LNCZMaB/AAcjW3NKi9zavP8Q
+          N0Lv7qn3rGce+1svibcce/c32Y+k95/DzZH352c98PeTqPRPvQ1uGm4GjTYPTJutkfeq3ubhN199
+          /Ug301VH6dv7I+9P9W+/fvD1w61vZBTl7tS7v3n/0dbW1oP1zUcPv9rc5GKo/HB9a2t964G3+Wj7
+          4VfbePHlhoGFqMRN+pkKHJWlKxzH6Vl5jiC3LZIgSOgqKmOsT0j5MLhZdx8+7HuPGg8f9b1vAog5
+          9sM/9L2treBm2326RWRx60Hz8YM+pqAj6oq13/3v8i+aTjeKfLAxoett46foQ7QxyCYb8RXtzjje
+          KDi72mSyoTw1wovyFmNs0r9HDx/yT/pX+7m1+eDhI/1Mnm99vfXo4e+8zV8DADM2p3u/+w/6T6Vr
+          pttrEqpdD/Wuy/H+AXx/pBj2LwpmMqCNj67p9KISoly8HL2i2XnD3nP0FW7UwoPwZjwbRXt/SJe/
+          r90T3Py1+va38vvgsRIQlWOedliUiX7LE0NmcHcKac24zKmgRYIRtwhqIJZoTgEBURJ3aZJyykCU
+          kSK2ZB18SdBYATtE8HxpKW7eoWqJT2TuqmNaZ2xP3Uryy/oA7k4m74LESdelPE3TWCbNwll5mRmH
+          es61cZoR9eTiMKH3L6ie9i8wrDMTyXfOv3AtQXlo6kWiMphso5QJoy0HR6o/GrN+OI0ZFNbcdVCk
+          TD8qz93J80jsYdk3RRPN3gZuPq3DV29fHj4/PIEJPOYsOoKRiunrSVpm/itwGr45OKB2ey+t/Dud
+          LemvYXSZns2IF9APCLXz8nyU0EaZb/LoLEtPSTBS45kBObWxQQIO2Toj6c5GZbhIMYO7gL2dw9zK
+          Pr9ocKUGr7VdmFF725t0a1VMCnQ+C/joNB7ByB2pL+BGdzYbR3klneOw43zIB+tqkdh/8VNmF2Pb
+          lU9Ng4+n7bUquqZtC2KB+oqR/okdMKeVZ8qZUfnAyneWm+I0w0ffRsW5fewO01J/JMqEtqxEzOFQ
+          +3A6Kw9He6c4l35TCiFm0nagNDKZ6thy6dIWlKX90+bPzTHi3alkZ+Uv5zZzHL2Abjg382Qry/Ou
+          oyd67PkToBirtRQCBS1GvQsODbd6d76wOFv73wV6Nqf897+XBzxnTX2ruvduwzstHyqEuberCKiW
+          dntQIBbe3UkfWc4H5yBhacaUnXVUTN47M37KWGpjbzGKtGzp2CfEe3fBu7BOgsoTyFFzusdhLfRR
+          te7bu5NesETmK/ESz4vySM62pk1P7ToovN8xAMN4Wfd/szAQmpAknbneqncKmwLKzNnLV4zg1eCV
+          Ldt9qgR8awlGy+p8aBwDOqGVFIacIRuTJ9CLRgwxu6+erQ6V06B6VXLNmvclUmXCM8tSCnClBh/7
+          +/LNmxOiYdlolAySijWRlfXrFFNTVLWPmtCCkPYV96HyUMlcibRjAh181D4alGySZkBdxPG0YOTQ
+          10EejyMx5TKhWTOil7YErE6o7a8scp0agghjjnmMSmzmzRyqWJF90KBOgr7DHbYSzAs+PnjikPOL
+          GvUextNqQglyvVfuxOihIpkY6V3yI13Sak+twhjU4HVWwmyNdhj0nevR+6Pr7AuUTYwfAHscROnF
+          nHk41DzjihuarQl5POJq1ASr46+jZlF8g5pIVhj8xthh2kstEqN70weWp0L96XOrXS0AQIeSjL0B
+          exMhsWiUx8+uH8vAj9k9V//35InPe80HAc514kXNeVzNn4S8+VArT4TjhfKcOlc8IYck+amKEs5m
+          Wtl+3cBFX5mwcjogUUl/OVEARAbE9299y73eEpC7TW9G9IyQuC0huUwJatm//927M5RQ/TDirdfv
+          yh+haWpQRd0Fj/2YhqEeCHahgpwPJKDO+owN7/DVjwG+C/Rsk5ZUbHaH5kO/WoKC+Efvjj07uMtY
+          BGxwPUDqU1AMYfrzhCCp3XMYNHgMj7o1J9XmUKaptNA7vCX3FB7LqyZBpW+0lugAGk+mc5aIss1j
+          iUsjnRUu211IuBwLDI44I36QHXW/K25UySFwUK/FcAVzE8NaJC27TOO8jbl8VXGk3KPmNCt+aU6c
+          ge3wRAcAXs+EOtx0xE11QVIZXnxt3s4Io7N8gnzzPmckcNlikFBsw6SaPB+VeTOv1mxP34fQRvcW
+          TQB8AM+hzghMlMX+sXe/BemrY0XfKcqmFvhT/Sk7CYA4/hRgxtViJ3zIkmHnSo2gqef77qcf+6ym
+          /inowsDf/fbvE/V/JjLyFirAufq/rYdbj+7fr+v/vnp0/zf93z9f/5dM2MYfpcM8S+AyKHG3ylmy
+          /pqt8cmgCCXzwoLXByRSZPl1/as0LsPv8qT+mGR1rqPY8nw//ZDkGfuL1d9O8+xDAj5LB0kXOna6
+          9uVVqIO1QYOb7RDlp5tk+Vn4U0Fs+H85fvOaWZLWN29Of4qrcXC0wiQLn12XMbd5MyuJWz3mbOv1
+          j+zR9LPDtP1zbER4nGDjSJ6ND9hY43wxI+4gxLvm05fZIBq3PP/uu8MXzac/J9PwL8nUnomtAbTC
+          ISsVZqEjpCVDi4ottB8OE/rThjNqlcXpbKK6Pb5OB3QXoD7h93sn+33vaP/45M0R/fJi33746s33
+          +16taJoVSteuZhax1lZEWs2J6PmVeDJ0Wzp9rVUOV5wL3tZO922ekHgxS9VcKn5G6nf7RmYrM9ZN
+          bFTcMQFpXrfM43FBy4xjAHXHErA/XKucRtin2+WDrA6pG8OMZaawOAlH0lBmjZWbHuNaGn4nXbvk
+          y/k5FpMn8+D9ujaEhjylM1G4wOjTp1BQkJw9iaNiBr/x67g0vYJ7Mr1uNjpFr6x7Qi7nqLAYRn8Y
+          D+hkE5N5njHj6EWyKs03VjCnhnsKPWzAQ1tRBej1MZSW0lkLf4l80UptxHMwC6OJ6MyVZhBVjNqy
+          BqMgNSNYVsYtj8dJeuE+rpAPsK5XP8isKXPQJibMTJxr9rCh1Gemjd4lI1UcYs1OWaCXewZtpokT
+          t5netpDZ8IvAkfyhyBPtflxwaQylcY8LSb5BR9mUPhzhKLaf4BoAm0AKrG5oov7Cw+zitXvmTBxD
+          q+aELVSVzKEm/kTP4CTPZqdqBtNzgkLNRKIksbYxSVwfFm0vzrKsdZJ0ouCf0zCUGcqm2Dnftp8M
+          yiuTG0RvuP1eYuJ2UXYo9lHslXf+RZLTtknFhRAFRSDhTC5AsoyCx+5FaMlRlpUdXZnI02V6G0B9
+          iA4Uc3IUF9n4g8pobX+oI8kV0k3iQhLPc7lXIjD8ezHIk2kpvypfzF4CF3Q4mvHTi0J+MkQLy1Ox
+          V8R/w5vJrEgG+AUcRIZfiPEpuMsxwUiVWOI+ztlgObrCHxjgLE7VyPkAmmMTBj1mWmOJshwdSpvB
+          QcVS4hTFEIlSj4iNIzgUXJ+S6AP4kR5Jn82c5UrpxK1wM5N4qQIsufipJLhlMRW59F8GJKCya5o8
+          ooEgfCtvyaEfIJV3kcEBOoIjTmmS/k6g/gLVMfZFwmSg54TNaIiSFI3DgE5WNTtXXG5RHDo7DCgV
+          8VmB8qKV8W0aqnhL/4u//vWLvoe4/bCYjhMJ4Xdolu2729Y7QYuF8Dy6rM4tnWLc1JaV+pK43Iqf
+          cM/f01p+ioLRkSZNfbqRY5VLJ29iGPagK1AyLQfzETxRPagYJ1PYBMvYLaopeTzGrneR8ROUWbOR
+          pTUqCjkrC61uPFBaJSgzxK+0Byap1+5XaiIAWL0Whluw78B3yzj7bwX0O3HdU1+5ajGWWGubU2oN
+          0GVlrXSw1RIbjreddQwAE46MOBy17DrKgmnFpR+Y1Y4ylZvVWm4LgqQxJ3T3Gwxt37lfghq3a2VZ
+          4swLSR7O8iQs2FWQdx+kka5Eu1WIY8Oj6SG5EVQiKKPMilx9HmlFwge+VhN0grwZZmgv3/AH88pC
+          cdctiye5wz17choDJ0m439voBQ1rod0P4TRKh/szFhHQj99Y9zFnMaTXuDj63ix4KtYjxOpylTRF
+          xlJNxtIOhqQPr84OpkTV6/r6Z/yvqmW1MCqBZ3X+jI07ht0R2KZtuIJkHddYaOHTQDqtVNDgNFH9
+          Zi8fnBMzKYuVr4NwhjKVmjAWFcXiIs9EXNfj0QjSG+0aXQBsFCMWVEyVx38+3vcky4ROP5VmxBOe
+          peAJiXKH4qRc6NhpaK0TcM/qeuSgC+/gzas3LyTQWBx/EE8wUY4B+ubCfXkkc5i30ooM6Wq8oNyo
+          AdQ7EhdqLxIwAPI8OzwDm4rV/ONf/62nA73o2UBXjQpq9FBgUfcsMBmaqhQa88HOJaZqPvlc2UVt
+          hl1hQeFhK5k19D8NKhNZ0zpm/xMGhPGUSSAjG9HQv//dK/hC9jX2gw3nhHLiVMLtmMT5rJU2ziZD
+          TnZH7d3H8VXca6TCvNEpGDQo7xF5OoTiPpkqvLKq6RQIN+X1AadAdXm291towk3Qa1TTyr0pGwQ3
+          d1TiMMY9He4qD7XIkruPBRNbI2N5n6qQOLqxi67tEdf4tNO7wRb6rZ3ELjSDZJsZKtt9I/Dvjl4r
+          7RYc8q1tIZDILtIv9+7Rtfpgc7P9HndS8HKeCgXvgnM8fTc9yfyHm5vvNznb5/PzKCfKV4SHx2/e
+          f/PNV394v9UdGIaNfn+yf/TquIbpCTtXYLQOTCnMNvp3AbbAw4lCf+tZSqz+iO4g8OKez6FQ295d
+          Qp3ejrX5KoPP8g7adyocaYCTaOJsHAsJC68mOAhzYYnLpDqBQ2o5jCUfdQXTrxRMnYslaIFENS/E
+          HNE8npt5EK8t8W5yqAgANqKvDgJ1HnD4a/iEHAJ8+mvPJ8PWx3k5AlUAo+S+sXMSLAFEmdBrXEfH
+          BE6/HZT3NSgb8NvTR1yjEdxRgX65ZH02cDOUYCWgNZ/c8a0z6WCUjLBsIS29CpuJFC9buA4p19Uz
+          undSdqIsmlpBYiuuOIIMLFdE9zfdy2wx1WZC5/7lb3Hq7fSVfenb9UR1/qoJKskQhNjNhHA4vOJO
+          IcibVFadOd6sTGF1iPBcKlFs2hbtVlQMpRsa2GDgocunKY6HeZz6zh1JbKIOX/xzfO1X16V9TOvJ
+          xrVHn7HBsmDruPJZu3hyPpucpig2YQzpl1w84IuCeAocaE+SV3P8X8zZG/ERP2RAeEguUUJzqdw7
+          hSbYWwpZnRNcOxwV9hThpFyx4C39WrN2i9GlvrGXEUcNoWmohuKaBG5SPEl1v0SqPFlHLTFeQ8hW
+          maepYVQU2SAhppjFfANjns6U89+ThEj8AdJml/XkJpi7nXDMRjTWdK7EU75UPrHONi3HV4rFXfGU
+          NLJhKQ3UV2AtQTujBQyK8q+CcE8weGfglgY/NjxQ8J1xm2uX9k9Z2gcdg3WqaOFV2PNEmf53vQcg
+          ykyY22PUbfNeKJTdmL380z709afKF8n99g3DHgy0Vvwl6THbJBE6hWJHJLlqxoKgDk+tHzlGcm59
+          dvdAN0kyfARqB/mI36gwZ3BGQyXuVKQ/EVpN2wd9Cjz5+uK0cplA6iN4O6cW4OWzWRODzHmtK4d0
+          ysaGqOgi32AEMwB/XBc7IJKD865uadZkbLRwPTcWpXZUMOCm6ZNtz+yg4zj6CRgtkjkILi0B9zsN
+          U0fEHZ0hTkRpucObG2hg6PNeCZipuzt3kOMA1waGqO6CNglE56CsZ6DUlXHc+9PdQ2LfOjaPto5W
+          1txCWsUAV6nnl9t0a+TZJaf0p29L/OGN8oR2bXztN6ie7LRF9jiY1O/x35hXz8UPrevTOCJ6RVaN
+          GIFFsuqJXm1ZpZ+RMh09X+ko+ljx62aQZRQtzGzk5jAyYq0y4eL0rqwP3PXu6FUiUy6PIHMg5OJ5
+          qaXzsTCDqeQkmGXVTOn+qrysdVzj5KqDssovJzvaN5ortcOBhrLWG6dGWyxKYkPIVKiKaMwR7FxZ
+          F11lIwiTSk9fWI5zkSJNwmmoLAww4p1naTZjO6FYFDCbIduFWLOHmU1hi2DlzTRPMmI9kpr+RqG/
+          HKnOM9BgPvre4Dwr4lSpeQ6gu3vSelKmuZGdrWu/2mVlvEvocLMhvCjbzF1FPnCNadNcssa66KJ8
+          JluvagxhX9RYfYbKvX7LmM54ZqwWH1JqWx1WCFR40K3bb42vQJPFWtS6lyhCDHarvN00SfgFqzd3
+          7iArSOCZDwXCQ8gVtDZeU9AixFTeirK/bSEh1B4sZY5iJ7yvo5Ae6XI/bILLBysuaBRKnEYbC8Nz
+          YoaZEUilEm6XP2tat878RSZ1EabKvyLPi+RU0o8WqLYB/GJOdh3BLQWgIdJT3tNmDTNCH5flKFRn
+          83phala5JiswdHAEMrVKR9OpoBy2248M5EMXvfWdIhs+p0nFkWyImqH++K9/7dndafBUnSvhba2z
+          AJHbeAkJX531uSBvk+uV8zrwGqcppL+RkoVlpmfX4gqPI6E934dwig8++VrBkO9SqxZ18644MSws
+          oeX6OP4Qj4VbwJ1B13g6gHMQQgUHWZ7PpqWWh2BQHM6QpTZJy4xuj0kswSaRN43zgq4OZAqn6eqg
+          3rp5o2JfbO7G+r12CUzAKukkgFa0RRtJYLyMIJ5Jra+kMD5y+28O9nVuQVZeqSDQn8fJKYd/pvHV
+          lC9HYsnYtj/IB2Lip16TodjUh/YTZHVHrlT7GQSaWoqinoqK5lhIdirQ4GVLUTpcz0brA/CB0Xhd
+          e2pd8wzkoec85PgxYeaqywIe1E3eV7K1MzgC75Akk7NozOUfDCQkMbHe2nGWXRQGgBwmCvMOqjRC
+          XV/l6w9CD+kxOG6aRo/OoiTlNE+8RvF1gpsYF7tB3FIqLvvEVIRgE5X5q+wyl9Ywvo2pcN1ygPFu
+          LRW+k+2LuZ3FEO1Vu76q9iF9B9/HMCeWKJvgV8LCUpN4MWL439SYCk7wKp4slW9Ln3rrdGBx3AW7
+          7VE7xvdvCZuV5d/XxeK0N2Kvsa4m7D/mNMiVvx58Qqq88JBznBPR0LkozhVk5C42Fnj+ll5GGGix
+          ouWWZjk957QyJA1JVMdfrTdemZVcVs8x5+lUqcBAFh1cXxF6T1Qq3itfxqJpbO2Zs9mpjhnk8DBQ
+          VS2K2eQNHBIgJBQ/B5q+Qzhj5uNLetpyZY3yOOYElgaf9Y2ON11J7ZmfwvvHMqd7nn9/0+SWMQIl
+          rZCoZDY7O5feOLuZVktaieG+KJhsEsnYtmqQo+fghgeAKFK9QF/0Aj/aUvU1F1kz2BlZmna/a4Um
+          5rXhatH0L3G4SHjMgI8E7M1Ac6srSraDXJIvwbnEUjjPbSREgz3Pk9yXLvp81llrrjbheZTiLhDf
+          DJ2J7+5H+bzFjNqbP+hFMizUqEZHrvKX3bkzP5Mke1jIEoX12tE+RjS+etGYT2eXmIiqc+qP6r5d
+          lYpvPFymwCj0l727H9N7927C0+hifnnNQR6CjFhO7D4NA+8ZAoF2q8ABFHo+hEfiaYCkgVUD437B
+          DnEnGddpefbdwfwM85yUSQj0OwEb5K7Tud9jakMuoezfpuJzpZ22nJP6spndaHaX3y/YvXejZl6B
+          XaNKbT1hfNnd21U4M/9I5fEH9iyup/Sufyge6pJ1TRoZXbeoR+EdKltuR1z4iDlz9vzn5l7uyPiy
+          rB3qqhvQzOq0oBam1IJbS81oNeySS5mgyxDZkVvdwjN+vILN2MTeW9YDvjrv3dtZ6nIXr/B2Z4g+
+          90SM1QGxl9BzbcjF25V+rTW/7DyVf5V9v6kpfZ1prRZLIoKW7G7AbKwyCVnajw5VrTOg0LJa3TB4
+          rSdD4WNNIQqQ+L4mBH1PedMeXxdlPAlV+P4JPXyVEDwLVLvbaSqFrcmN4DPOTCax/SQ9ScJeYo+C
+          prCw1IQQviHo1J8zrb4KN4AyBT9b3H+bRhXASPmiSe4o5SYkGeE9iDoRSJVKQ5TSokkEKYK+LlBT
+          GC95N0alLymLiDuXNAjaNgnip4zqVn5ZW8E5S9s1/DxFgpe90a2bTB9W24EaFY3iVhMkPUIYUyhR
+          SkGXSNTS/5zZtPKyjZP5nV4fn82P1JHUG1+R/V5JjuqSiDB4YkFrY8N7zZvtZK2SKBqm69i3gllN
+          xhM48JscVCCOxC1nJlEVCTBErXCPldkMeVjK0LXJ8FAtodHZ0NH7ghEEiVBe9679eghyKOsQg4cJ
+          8Ja/+Dg/4S8kwtv4sb+IC5L1h+I8UQWArzWYUFavZjoYnGf9zgoB52sWoEtoVhF8O/ibotSZRxgk
+          ks0L8OBVc8kKwJngO5si2Ic/QZC3a02UoltLQsmwrazsClT8u8xcK8Bsi4vtsHjTpjpuZ4o5EoH6
+          tSDNnbuqEfpAi7/Ud4e0rFxy+Toj9qc1b8MCRrmzXbV5Chzt1nbNSYt2MnC4aTHqNzirRj+rnPJR
+          3/Pv3QOhCJwLt9opVjW32vzvWGDH/W+z7b27NNtQB7T1iGnXjOqOgU/LdW7yKwhTWsPt1lnI5xYb
+          Qsh/XktRpwIUy6xCbL7lVf4ypgiAjSEfWHqniSCDSKHOwjvujM47Z2xyj0xDe4BM5pxl5lQj47uR
+          KVBf+evbRJE+JZrYrzm41HueJEzoLSyvdyyiSncvXFNe5jfHH8TJ9oAx71Q1SPF3yA5lYEvkT8Wi
+          Ssd9dSEnZbv+psExf1QQs1GnAXWGJkceVeqtCr7eujcKVvKGbD287Z/b+E7YbuH43E+7j0ajWfuG
+          nnZrNhYIdCqv2zhuF5tYclNeM12ymiv4JmmL3PuZZZibhUYWXQxSGVcqdVCN29QgBU/bfvO65v8b
+          q6thm5vVVFPqYdMo6d4OwVPLEqbcCAO+QQQrXuBGa7OpAtQKQY5i4rQLIk/E5NNZ4J1gvrcPBYew
+          HTecYqAXuDhlm31Mfk8Qu2gq/kl7Y61ulurzzCdwwp3hutLfKf1Swdad0xiu2UOwCtNxVHn0j6Bb
+          k/xqxKil3vHeQeAw1Hi5x0NwcDBnbQi/R3n2N6/D4xd/fn/4+gSW6AeboClW8gaA74r6TWHA4Anp
+          GNWWeKOcaOebkT+rnHBcTZ+bt8aZE42KWKloVp6ziY+t8Mh/obNGxGoWCiwmNQRqoTV5FjYaNPJL
+          wAv2JI9j/eJwiLkGjdYfsjHzGfUgIv+L7S+ClqIPhVZ2cEOauCruQVOzQUmj12D5QtuXNBMkkV4b
+          apEbd6nDXnPEUcXHF8gdNqyFUmGeHEbVZrNPCjOqcc9sj2IbBd0e040WgGsV/ZUnLW64sXGD0UrT
+          SXQNnK5XNdGlHUAcxLta+e1aySEhUcbjUaul00hCHZhYM0WxptSgrq2CO1TGxUY+SqkXJyliWzyx
+          DGDzhqd5FRzcCEliV1yzOUp26RyjRqCrSb/OHDgZJUrZ3IBeY5ce8z4AGk82wMVugJZv7E2nnPuC
+          U5NsHHMqGmTWjHPZPHni7clZlRo0kv5wQRFVm0Ql6RCVJUGSbTl7DhXhzZOQdbV/pshfh+ekegZx
+          GS0CFmm0RRrT5lDvSLyP1arFEZkWjl9kpfpktagL+O5ZKuQUTkTJQnxgfG2igltDxgCRpMtBnpzG
+          dQiq1BQV6BrKgjYTdsuWBFYd0ANVAhQlpBsY16/SjlvlQjndRlwqXzi67LROCDoaj6h/NolUVbmw
+          54bDzh8u9Ajt7ZH0KDveFMUo7NJHmZwFq6w2iaVqOAuWrLNj9R3fmXVFXnVm7HqociFf0nEzl709
+          K2HUdyyfZE5EomoxVcfTni6JU7j0ncOSVWl97J1+2ld9yV+08VX+n9q5EaleNTYWSmvDXf5NYUWL
+          35FVGxYcqJVwyDkKdHaccKSn4En7Xv0bhz6Yr+ide5WpKqzt48pLrTpjZG2NSLeaVJ/WGzQUps4M
+          OSpI+X1iIoJOvsnybZLQZBmxjvaucmyU5CaOTG6ahnO6Kmhq7yNt6tsoyR+b5AaNnCf1eBJfKqHq
+          bMHIEqFmYsUDDrWG1Li8+uLmTdK7cX51U3zWFIyyds5BoVNK6f5ndS6+xSozswSU0vY3Fy9jsV+a
+          iMjvTg7efxMoLv4tu6f6vb/ODvYPDuDxh3pKLYJdFRRD3UF0ctt/Caf77vwTKhOBHcD7n7jFkMO5
+          BqXOi9EeLdyW7oM1KZJ0thEzwznwCPqyby6o4TmhUOaTMp5XDulWDvX2qOdGu9o0fbuxneQLUmat
+          M+hSU04d2baKxpzh980zvGnwK8+zqc6tpbMs26dso3Zc2XVOXeKvXnmqnPJGdRX0WpwpdH5oenzN
+          h1UrVMq43dNOdAdydmvkuX6UGxezctYtTLkEldnYbxxaVW276AH6CSf1bTl6FUU139WymtBgLdgH
+          NhKG0iSbaYsQNcfKvNnUupslBZEUNK9nvPN71/Tv1avhcP3bbycTzrcj2e3C744DXcMI39dpSevt
+          pHg8JlD6GTi5pMbH1bdXR5Lp+pL9eg7ToO5M7Y+j03gscgyH9ROM2sRM7XTVRs4cjUuNoDU6Uurn
+          3l0eeP0uQ5SvwKbzul2LvV2b3aKMmu9cAIS3ssm1eBnMUSwRdC/pqrYXy9pGn6ETtLtDV2rXWp4p
+          3qP387JN6UwqPIiAVEZqkVapjcYUaJKgpDZJlpWBZmvTeOgh+RrUTg01NCMFb402QQHP1Plb79l8
+          y3qvpUbxsMbl12hd5Vtr3S08XNBIUSwp+S2rzaZdTBiuzEoDNS/euYFHqrA8a+5YWJxDIkNdfK/W
+          pkiGsdFuIXFAk6W2i7TbhFCKtVsJmwCu1mxuDjlVrmNdZDQVL5QWatyHehrWupGD+hwjzPYLtu1L
+          DA48aNE3PbXo/lpdH2nIMw7ZKLQQT59D3IO9t05I/g3zt67s7jCJSh6wDiSDUPNqU13lHvCy7IBh
+          De/Xmlk0XEaNC95oetHBhndSj9rHa4voxjjrJBlSC9l1Wftr/lfUAPxol2Rl1kG9IcakimStMYhz
+          T0GqnW/skP8svxAPBVaXqJSMUS3DuWIIxNeCc0tKojTksgShL+BKWZwztrKYS9fuIEq/KD0SVTM4
+          +mdnZ+PY1dGqnJpdTgaf4ESdGw9ayzv4lzEW/4I22rRhn51rjpUl39v1fLavpGwp5F97d9PKDvQj
+          OzaipKFkRrAgNC+4hJhNxaG1qm2GUAMrjwQ7jJce1bGQehJDmgRHKp+rxY47L2QFOovU6TV1SEeD
+          SVVpsWxfmrUCN6FZ5qCRVJUqsR12Ag4lyON1sS7DayfUGjzwwsgu4uSRist9sUN3IG1fOZFYlB2K
+          nnpi2gZu150LdndVR0EbIFt9biQhbclJgLgGh+6gx1PG0vU9JpDkJwho0nb6Tvcd7vbfgadO3X/G
+          ShUiGWV1KGpa9+dhB65fyrkm6PSYwWm0HAuc7dbbw44EJI/jYlBklu2MLtKOTGQLVlNm2QVjsc4b
+          fHkumZwTTgHAWsdsNGoQK7impcqAX8uXO+qKvptWVGinm+I5KU5sN5LpMqSLu7Rs/GzGttOk1G3Z
+          nESIIH6n5nPT1hYmcw7vs3YCW8U7FCxw32SIOVqRwOIJvigVktneLghAkGYgcDeSzU7TJ0jTcChU
+          ud2ZjNk76wOVVAp8048KB+dgKAEByJbxGRRfNbTmD+2AhpuuwJwKZsRNvDIxN/8U36p/mhPUQh+o
+          lV2gFKX8JG8nQxg6HWhaEblydyJ6YvuvgvS5Hkc7qAj/IeaAujFNstPJQ+WUqzugdMLdWQfXMOAr
+          Oj7J6AQzMKsjHNR4a/lSOW4H3X4jNVLwo0r93dpgRb8W/GsqEaxUL4viQJZxbPnnObgsKCHedIhR
+          7lHdPkBcGGyez9FSmMIHVW3ToignYUPrCDnXgQxNlvA169DSg1udH5Zj8OvOnc8WoYNRF0fcyP5o
+          Oq4DmZgT0kI8iV9xnsbI6QU/1Ql78YhvLgo5FuZDYpyVd7s3Jhk3XzFI4w7hQnXYVQm32x1wfX5q
+          /MtyLlqu+zCre4n/Dua4xNu8mHKP58oeAlx+UpX4UF4rVnKUunQDksPSjWHlFYvQt65fE+Zgqjuo
+          yeqJ2NlXJKpH1rRUfAPEcUupEpo8Uj6hY7EHr6mkuEDFRwn8RBrcfWaFC1ZjeTVbXpJaYQs73vH+
+          elFej2HFhepAfYwakpIB8MuGUU8D3vJOWdGih+z4t1A7r2pHc8ZkmxoEG9S2UQa2uj3tNtazuiVB
+          5Oo0rrKtO22+7LWYpbUNStq1maCalr6+d4ebSZLd2hBtVr2OMpm28gg6rMI13qdVvISgiap+go3x
+          ELwPfbSkcVBqSC7sreul2xYYB5EcPeDMSN7L6VFtwt+BRE8VDrXp6O3ThNhORxfvIl19g8U0wYSI
+          ZhrwBNWGsZRujJgkqH+pBXQWy43uWx5yw8W2T9tdtYV1mGe+YL6iVRW5kurRwo8DhGyLzUj5oHzI
+          xjOa5Hk2HmpHeMu1hdUxLASyojrSSkS4zCEItT3LRy383KT2zlBfuNPzbZHnlHi8tSfB1xnfgCp2
+          zntc+CDgPJ9mUgc3deky3ppmkl0JTducvcQruNWX87bOmva6quiVrnyFkafSdyh7A3Ma2EcC/QRk
+          q4BrkagrdEaQxDgKf0HSSoyqXzRHHdTvUAJO/XFEXfmqsev01ahvIWrGRQn8VV817Wh7NkKTR0Hl
+          RXhAst19pDD4qkphwBWOSs5vIkFiREQKyTcicGDXosg72jti12gYm2Pi15A3qVZOnTMfqPoyEa3+
+          BQottCCatf8qcRR7N1tpFgKvmVHBuF2Ly2kF+4ouV/u0enaFbnRR6f0jFTyjFCTI8FKINYIupAuL
+          e5kkRcFRYIYZ8g4chZ8drak0LaX302x4VnMm45pS1912B2ZO3FRrTn6X22Z26dRd/vvRTEqUD8N5
+          UUaYis1elBTmV7e83EYZJBqfFewtNQXJU1BQv6bID7hbudRrovFae6z7OLaTB9TtAjUt5p1K+6M3
+          jfZ1tDD0zSSgUqpgCdMftQe+mY8tBW3rJCSBJVFXQ0CphW4dGHzBDJfNU65XRcRRNa9b2GdTOmvx
+          i7iELdu3S6rVyqnVK7TZle36bq02pgN2SZz5Zi+YvJ6K0Kc0isw5K4+7ZMSZpuGZ9F2KF2yQ6MGt
+          Q82JGqjfVJu+tuTjh3mGKYqocKGe0V3VFAcbDBKLbeK6UHc1f9osA/RL+SA5tWEQws8eP4Xm+8Wn
+          ohIzKxHZDit2M5Bj5GptRWNlHbVd7My47bABD1C5rzwFg62c0mw+G+zBMg49gjxPiXUWgb7FK1Jz
+          GSpbolXC0JLSjPdNYIh/rYCCJQq40l/VVL04no34hWkoPjdVjFozoOvtrMRNKxv1do7LIbvM+baD
+          IusGcB+fMm/jsdcVbWdQ0xSw+sna0rm+hH3xwrMO7S18YtbqeSY7EMLJxwppT7yVrMHtzNRNF7ZK
+          ATmcH/8gBKTVMa46f1eWYtgWY6/CudqQ2mWwkltav21GgVPETMfkYp5tadx10U5O00QQNO6ctpve
+          CYQ+pRcAV5xmlT0eV0tNR/NrOiK1idPTTmEanbmKGyy58k2tEi9nbf5Ks6a7UvfSav5IanENLJxV
+          WNiqGuhcyzib61bUO5KTO6xlOJGqigpfvLs4iY6DHAlI67V/sIsqOSAdSmAomzsLGglR1rV/jfKa
+          aP6iciaoq3FU5+01PQ0h0p+ZWpeqaOsTTijMA3xqxcvqOuHGrmKA08frQrEjPktckwbZbphAgOhn
+          MxbXecC6euBmybKV7NISfTBjETFVvwYagmq9/397X7rcxpWs2b/5FNXojmjABkGQoihaEuWmuMxl
+          txaHSNnd7XBIRaBAlglUYaoKomhZEfc1JmLmOeb/PMp9kskvM89SC0BoafV4GhW2SNZy1jx5MvNk
+          fsmRv1M/7pcpg5ulw/UXut+eqsYjoVk4v2gq+90tZXsendVJkVpcWV4SYpfunBgrkTUnEHQhbE+f
+          tvS2QkNNe5JF0M4LP1RJm57bxOrtqRXnq2/LWi6/64cF1NukleusmIayKU9uG2vg+1plnNy2XBdu
+          fVhVKmnKff1DH0GylPv4jVvgDOhbXiLYEoFizpwc7QTwJUFMO3YuKxt3Wp5SzmivYm/pPXZoSYmd
+          FW5g7CxaLhsapNZ2aNUTEGKIhaNtkkCgpiWr0T4NFVWY+bxqYkk/QXV5XYpN0oOK5d61SKaQYTlQ
+          r1q5PXrR4Nv3C9o9yRuaLXmSP7HVmhF7UYvNXUN1tQdMcwt6oFuMITbAhqX+9wbD9QRGKyipvFOg
+          nohxgun9SV6TZfeDPAmn+WXKuFwSlMaoTxzskthIznKETQNu1yCcIlOcaV5Z5azqI810PsmtX2UD
+          vZV3BhchV4+HNJGQKufQ2s2RXWVo9obDaBTOxkXbO1qcO8zLLFyD3zYpayzGUlE7lrCzYY6rHPlI
+          QY4flXhQde5Or2MaD3H1DM22cD8QG2H0lpYGbexwuOIJpclsTzCA4mrFjJATh+qBkg/UplJLmgzK
+          9maWFczQVDKYNexEzbmtzMAsG2zGhkXrf91AIZlngOuXTW0TGLvsx022MzY6TOqCAcJ4qcE10ZHe
+          h+nRR2Gq+8LS5NIkq8urSXvpwHS+/nruib2zOLpxskQlCXRNb3oJHBzf1cLDbWx4qejM6H+tVulg
+          x+zSZce+d43AE7cvtdJniYMCdZrJ710KDBbjnSTuR4h0/RBYVQ4hp3ALLD9piO2tai9xzmYiDTmv
+          SOXXrFYVFs2mtUCy18UGj1MA/loHR0N6yMeSd1xROAMR0Cae0Mr4tgIcPtipxFmCebF07Nh53yud
+          hLaWVB5E0OvFSRxcRuMp9XWhwiCZZWLRUz3fBKvKV5by+acEvnnJyx4hhRgcWM9/7HN2lP7b42M9
+          WZX0LN6DI/vAOdSc4UAGveTtBE4dwcuz4/XNna7uZeLXE+SzqeyKvtqsU3te5auk5aW5wTjURSg0
+          J9jvDAQQ4XjkXFFCaAyfj83a2NvkXTPU1HdBTkoh5/vB8S5J+fkx8DLBYH5U8PSfKil+Yk4YMN9J
+          RH95VAGfpF2O17dJxfumnIQXbZesVNU8vBLjxrFfKv95tDAnGa3xA2niFWDzYxVR637EJVPej62O
+          sNABp5zwOPBc0z0f6tH7xDhaP+ph3E+tzgK/WS66dgi896eOsUyXqmUYoPInCq2zpxnK5/TsitXd
+          89jSBJ/kq56t88GAyK3N1pyP80xpBdSGCWM0Wfran7w3LmZ3QZwfVUesyn5XPS3grfwkiT0HEiZ7
+          JmHPjaQqujVu7SYYtkQ3v7U4YRqMWwKEa7GTJRdZLdSYBWMUV/aY/aRQWq8dnx5G29TWBVG1nuOZ
+          cgjFI16YppqNzmOVANh3zAQjGHeajnrT6BZHv833O8un47hov4guIripZd/y985l/0ldKmQ+Y13K
+          6on0dPEbhCXLjRtglozXEvLp9TucJC4ReG/vsweVGl3avVKzogSCqhb3NT2eEd8ae99UjeH85Me4
+          +Mm0uMJA5QDGfV8y0dPsaOhHKSHbzAMjasBQa2ogtXt+yxZxVx1gakIzfhV76bhFpYX+xEHx9NHe
+          H7m9LQNRqR6Cw2E7AtZQ6R1i33RzjnyNehyPU8mdY2oa93HwhE2UaN5q3shbvCdUV+cSZfeXK/v0
+          7MXJs/92yhm4Pt6jTQatJFsm4zlObN5a7jRJwk62lCPnYVli+uO76kC3UrvE09GoheidfXO0ARlc
+          TtI0ZOc20bbI0hkiFC+J1WMnap/HJA3wr9BzO82SLpaCfinCFbJfyd/fzrGR6+vGFDvvgEfhk/yj
+          i5Kpoq5xls15vlm74q4BYXBIC8fHDavYr64+k10Pl45HO/WtWNNLEovYWkUtaRm0d3tjQKJubv+6
+          SNOh/aPg1JYXPihCyTg/D0YN1GCaUrhZ6lRkjtFS01Za/IVzKBnVgwqYQEeeOb9uR5bBIC7W4986
+          xvStg+JbpIueud3R12Soyu/wvcq0y9s8lOWXccsUZga3/Ibe9a3VnU5zGjpjH2IQMtiH2GOd/qJB
+          iMVcxFoMkK3guMhhlD2GclQbEWQp1q+jkUZPNXqlsvjRHCtM9VRz3p8gsdNaLVNUg1VHzEALTDox
+          o1lQHU02nL2SDadRdSgbHJc18mB1JaczBjeFyQZ7Ed05DuPxLOOsWMMh6f4IEHo3cWGSsUv01lqM
+          XFAV5B1Xy4pbsf/EnBpf+AHsCy2W8Ohx2RS8lWl+tohCwNS7XK751zOtlv7wSL2JLvRdtv/V9PQW
+          IHOdbRrUyJ22mE33g2GqgFDTLKVyJySQxWNAXE1pr/y2NWfo9NB2qcErOL7b30cqHMaKMc39c2zB
+          2Dk7jcNbRqIzI/B3EhHcELB7Cel4l+m1AFQBjqI3r5f7SX5dAaXqmnE6xTCdwT3Zan7LD4DnHNw6
+          c8FUtY06J/qGZ1fZ/qislLVfJaWmvL21hnJu7sb5I6nKa44lBSEC5XPRmyi7kZjQ0ciYBvPIjS2n
+          rcC5R0iCVC84wvsSHsYCizEG8hSgTxWRVhugDXyG3cSSgF05Iri0fKIo/77EKnpfcat9W9jkS7UB
+          u61i3T3wK7aacpXlbfK2onhfI93HFmqo3RROeoVX4aKTmMYxREfnChANXyi5O3GiibyFHLnpors9
+          3As2mzaYwWxM9RW3ooCYwkpp1CEzljAm5jPDOrPgIZVCa+xjMQupeMWbLjgYqDOOi76KSCZgoscq
+          /qO+1gtOeKu3dI94V4gHso5c0H6c2yURnIxKrBjO8cScr1PNKpOSKHgJYz471SvE+XWWEq20mu36
+          OYcpcD2DdDYGFk9wPoYfaS9YnjPWV81lOB4Fbrb4VK9MCF+DDjaCrdt2r7YlbpTZWczil1pDbjFy
+          ifUt4UzWEGQIvOGQFpA71nXhfZDPcvgf+6e71Q1UTnsjbLOMWM/TWtR5aEVJw1EkqSDnIky+PLkv
+          33inMMDhlWNHzhPSZiR7g5JrNwwPLdf5Q/75+3QcFrDuQxgsnTaVkMAqLztXqKzk31x6nZkFzTbL
+          Y53SK3A3Vo9i44GMxf2+Lt6qOJd79hTzSRnFMeG8WHk1TXnQKnn30Gb4fA7Cb8cHzylLp7efzJV1
+          L6M0AjTOA/GVgMjqUd17kz7BzfdfGeF7MdwmCV/RVLZbwSlq6+8WblAcX01UiyMadUqO7cncA+Ie
+          b5gWgc1WBiKqhzNbPGQLRUS/gQIQ/7zQGdrL6mL6ZiXh8mEAx2P8aeNPy2PAmgwuDYCbC4Ko64l8
+          P/IwtnwKu+cCGOQU1irGC5pUARUezLKOerCag9raqxpXjePCWTbXWFsPV78tjsaeYhTtxLeOmAS+
+          dWNv8xF5vUD4E0GsTebZR30bKapvDl+J1VA8FzFimuYqqSW++3qUT5wzU6U3oDm/M41fMTzepgbn
+          m3TGvlG4tLXqCzCmUoO6Jf8rM0rOb4FDpeaBYyhiCxf4Y/yT9d57F7ibbobwBseJhCbon+sqV7Uw
+          pSRvHwgJagSIYbQCg1UAyxgvPYeWaee5OUFTCf5gXQLJLELBBxbjMBMa2pEsyiw0n8QcmT3ak9DG
+          Txj5indK09A3Q154ORTRtfnEzsCrex8Yyfe+N6LN/Knhv4Z1vb+VJd/iT1SCxeHZ8NpTxZ7mlr+v
+          TFh5ch54M+ENusaX7MNPsDq2H5BzyWK3qGPJIj8dCxJqvWiEU2uL5vjNsDhrjFJeZgRr3P/jO1O5
+          SJIyE+0cnOHcA4Kt5g8vd8KPWls6jatt1wEL/NDKpVkVVx5GGvMsaA8aN7A5CCEM/AvatNkX/pQH
+          l/QIeP4Tya1EpHjB4rH+zair4tZ/yEifeCYuJ+o3giMCEW/L8grJ5E3yijgRkhR5kI4RcBGniWcW
+          lS9OoSWVJRYN/SxLg80BuC421Fe358bTuyrlfcZEazbQiYfeKG1IUymlnNDDWhhsEhhJb56/maB3
+          lnNaz4NRKo9Ag3PSqBwSJJ7b3Lr/4KluJ5qtb46kTF2otmWPMdXn22q9IcTnXUFruopuKtr7nEOQ
+          9kRzzO7VMo81xx/Y+usnFzEOE/BZ2SN+4jvEj/Rk0p0oTDRSuumAAs4ElZdxyxxQnFvHCq8xE4NB
+          Zt5yMQbOGi9PwGr4tpyIy6FHrI3GL3rP7sqVttj7nZq7/6Ti7c8edTwWAEItRQBMxPm2ofsSKVzt
+          ntytnL/UJhd8CyjYx+ItWwf3XeqIECXZHvdoI5QEb7yu/QPAyvFfzZEvrbi126nrNKWrLh0Oxnza
+          lzZ5vdtS1c/ehBtJO7ulEa2+y6RlXw3OeckQJYf5KUnwUTKI+I88HcQ0pJCBgWVXPedU/3gbKuBo
+          jUVNfQxsFEtt65vl20pwfXPXa6OjO2IR0lIvn3qle83+/2X3fRBh9abEBDSU5k+XUqLlVD9DQvl5
+          qTH7GWPGXa2dDBvORLzJkC7xXdrSQDaPXx4T4WwywMfmztoaY1iEbBl8E0fXJpSZ8WyI+5LuLYZC
+          k78tN9sto3XmBXuaG5fNSVgUOG8MaZ0IQjGSGvImalsypp7wNmfygJWjt82G4gfEDSUTbHWD8j8z
+          W5T/mW6wtfTLFii0uaRqUVisNCMI2PLtDx129C4bhDZadbSFUjHUouejakkk3FXHwEXf8r7Dm9p3
+          xLu4HcwayiG4ljoeA6FPe6zxL7V0BSUZu4R0FMP0b3CMHoie9lrw4oevMfdInESbrXF1N1kuYZPU
+          10zYSZwFgBPKHcY6TnTLwe+MnlodCy3nfuAZHMxTL3fAohyV0wZDDSjNTzDBEH00lj+5bEpiYS8q
+          fFbQOIATwRPuIXo0vCbZ4druG9ufhUA8ecxI1rkKTiARr4QqHgh7BDNuj3z1YxM8MfXLd3vxUxRW
+          vCJ9i5KZxDlQk6hVWtOTNx26kmnD/HQlykHggS+vvq8oHYv7g6Fda8JZxCS6Zd6uZjKQDn3duFjn
+          y39Di0rh04ovNlaSZLajYVyIHsShQoimhTV7zBbGC8lH0AgQZkcGR+CMxgz9owIWZaBhKjzo/q3c
+          7FtDknaTMRRmMlx72AU2uW6V1b2rYQxImY6o3dqqu+dwCmGHdAoO9qAKf2qjbstTW4Lk/ulb80ET
+          hTRse2js6V9Pj16dHb14emrN+u0WbsJDj8SiI+JonEBSOvuyiNl371lUnEwmxNw4Mu/lyUE4HkO6
+          4jf/evLqIE1G8cVjcSpqKdiYfMztaCHI1xT2NM4H5vd9rBfzB5WSk4xj/vzLgXjZRiyft/7yPXtG
+          Iu7/+Z1XaPPxLGH9kh9/F05vslnOH3fqfX569Ozs5Pkz6rV63uZXefQrMk1OQWNFlEguUf/DZ0dH
+          h6evfnj+4vDUfZeRFBJnv+IU8NdhRLrZ8NfJLC9+nRCrD7H4q4U8P3uFgo4OXRkk+FCzw/GvAqKK
+          Aqk0hlOTP+gBnzP+ei1x4fwi38BL+IVqWbNJmYElz/ZrWmqgdYwJd5sEjFTy313TtpPzuWigXSBR
+          K2hrdpjANqmF5djy29XqlEQWA5cxiZ7hIPSUhpF9on3gDD3ckXVinS0YdLMiDyiD8aeohwyO+6Sy
+          Fh2Fz5z4tkWOwCtHNbQn4Vui4z7UnAzGGTmoDtaDXUi8kzihp4U6E7qXsGiCr4PdTW+teVNunbyf
+          Qh0/SdrXAgDqJrThjfqqw3h56jtrQC+nJJdQo9lNrCE8yaFM2iclB1kN7jifjfxX2rub32x1JEaG
+          fdn2SAR9uyY2ZnDfNt99JNY9k46EUSyoJNIOzFDRX6ytdrmYjhoGEzkJOKcPrh6gecavX7+FAZEr
+          WHdmV51evOx76HaqAzQksWgouv+5Nxw+FoCXtrMSdNUcc8UPNusxV9iLjO+/5/cPwMvNnSdHnVtq
+          OJpXw/FyNTzWGkwCzzkv7vIQMUgP7kIO1QTFT46cbe/s6HTbGPhEsryvyVjLtj7ce7p/ehbQkpH3
+          8tqabrAjlUKf8/s+GVtTHixiRuJk8K47W6UppO1dqBye+Oc/pj/RMNGfNEpoGMaNM2O38QwHPk3P
+          oZ3t4rWSMGM+2Zr3yeZOqeg7897b2u7YVQexNndr1DwC/V+qLw29j/NlnbhLpv3t5ggSDu3CJDmA
+          USvtejiWGDMqZ1uXNaYtd7d3XRO0AX3Ur3CQ26/6/T7+b65hWO6Py1HAp8RMJvktx5RgJ1Pru6qc
+          ZEoDugO/IrGlV2Wi4mYauRibIUntc8eoHCjD0A/t4Y8of3surcjzu/NpxRY6hay7U9aH6FPU88i2
+          nVla2XuK20+Th1XTEnaZBejS9IEZAsyEKYtYwfDH6CfMd99FdwbR118/sKP8dWU8EFIznUM378sd
+          GEfGW7ZmlMX600zabSEcjIWQHhi6VA5u8rsveoXT6UaeDTYmtD9u/By+CTcG6WRD06Bs5MzLJpON
+          MxIV8t5V8VF1ENX3d7a3+SddlZ93trbvbJp7cn9zZ2f77u+C/pcYgBkjcwe/+ze9gHkLDFqa9Z7O
+          es/M+tpazNgeINUsjYcsR0GNPhjHnK5+0fPzNMyGT8OECs/mvoefb4t5j0/4R/VpEhW9l1lcuf2W
+          vqIbOc66Z5Dw4fk7GMfUO2KYy7w8Dm8g/3y13Lu/3PSe0D8HANVOlv6E5LBJPvftCbI/xOG4F8Py
+          2TvBv8u+TGo7IBoOWYv9wI9OAfZ16zd3FgxNhoi9SbTgjVnc2x/HFwx4vegl0m3jUVwjmdI7F1k4
+          vYwHOdHPOF34JusyIyKn3jH980MUX1wurH2WwEFtal65SotxnOCNjEiDI9oO43zKoCZZvuAtqIOG
+          uFk6fDEjTS8nrQoK3pWNfYGjI2cxojvJkJ5iU5CERuKfRs9mYwvtb7C9z0PBwsH2F47jkCTMML+i
+          OhIGOW4bWdCXcfnXl9S/tbU/H3CPeWFAFmTmfkhTnF600+Q7WjP3TRn2K0SeHEBJva+l4mbH04OY
+          tJ2xYs0FecVTOJ0K8jMsAN/zbx7EiqJrtRiVWsDn1XyPDRyZcq33PHyCOcSCD7r9owpTj0Wa46x5
+          PqQdA9mx3SN8A8dI9i3uCtQd5BWdTlSD9z3cDv20oTYEMndLIYoCf4GbZ6xSJYGLVeQyOUStXpI6
+          kfOHXiBDMMjC/FK6A0u3iZ9in2nJ5WCcZc9vtE8mNJG9ptUvMjdhcfvjKCt0sm0j0oToGvbxFzi7
+          yaGS6nR3bWbDdwHrfS2mFviQuj5oqHbZ7CqsscFjhCnF83DRQF3J30WNLzrzfJQg957Q1+0BFn6u
+          h4+4oxBLSD+HJ+2BMUkxi6AX+WfvLAuTXC3T7KXJvIYeG7bjtgw4ufJakLxb77tzkwFBsUO464Fs
+          W26ouEt8MKhwIDQxtZekw+87y2fccS0ZwJyXTR7PioJj0KRI+bONCaTmu6ns2CnkPzmO+z3rr1WG
+          ICtUiWRykfGRse7lZYQGHsRcDa/00qNb+ESmHC2XJKKTaHLOnlCq2HCED2k2XJysjIfsULsAEv7R
+          t48k9EDH6Ek4S3AyeDQa4bjSr1+kcql/L/CYdNtj672T59UTBA/rbzIvWWNW84qhgeuV8e5ptDpz
+          QcG8fJpF2hyhUuEZk26QGaiiTDHHOgvxvd9/HhagHFyg7G5lBHZ0ZORrnmaeM3CdWQgXadM4FvEg
+          HMNWkVxEE1lC3l+9HPkYho9v2ru0gXfmecI+oXUaZiZ34EkypEKLNGvb9Q+R6Gn49od4yO4MjYXo
+          IsJuhZnmBJQm6kFgmSRLqyThIeaiEtQZkpn0aNNOWYK56Z2nw5vTSVgNm2lY/fPywUluSYarK6NX
+          MzGUsyKJs31xGWeVB+8bPYqpWP9EUjqNkMiG/mKPu6KtpggHxX1/86b9ekojjenCngpcYaC+mbAT
+          to70GhD5ubtOwHbzc8ky3EkCsyz1+s5uf9F0ow/eRjORQ2CksbjoLMooiC3KUnspbhbfm66bpBjw
+          V7zQm+p12EJ2XiNxwp/K/tF7nI6HzXvPNBwyAHiRwo6jdPx+YSNzxvuSEKLNfsexeG0cNTkuPowU
+          b60Rna1XqB3/zBUqoJmJijLjHDziPC+laaI1x/6SaRZ9lvrnZNzzqzxD5r5pGGcScNINOIyN6Pul
+          +Iyey8ZspX1L9ooi1fughs6XQAYq5JTL4LunnEEJyREhoixDd5tb8wjvXyiRGEl+OZlkULyFXytv
+          7di9oNCcIAFKQWrSfU9ZgrQCmWOWf7DGkznAbE+UaaOyTk2gQYN7DtzaDC4Hi+HcfZEw1HZoLxyz
+          MtF8RPA+uyHRfnIaZW/iQdTWDvcOnpx89/j5/ovDV6dHL74/OTjqBMR2azaZzyIJNGlYy6oGn2VT
+          fy6Ezc6Kx3E0HrYZmEczgWAO+Tj6gLkTN1wThcAlohswsL7Xn2fRtZnXQDwLWXznQNAnEqwFZ77m
+          dXSb7PAivW5fEg/4BcrJJ4syuqhcskt2mOKNndOewJPRrbjFuV2TcuaUB2aQWq25n2EptaFKQwTS
+          IWMLPEjdhzbH31WwXhcZQHWxPj60w/7HJGh7+ePzijLeqcW+Wzbk2AlKNBDCrXkM3pBOjTstHiuT
+          EHPS02xuWFkVvyValQfpLOFDXMRf01qFlrpftPsd5KuJskF0lnJbaSlzhhIL8tuMldOUG76ubpTg
+          wdHQTgMEzryNdurkcMMV2xylPTCswzr7IImgO+qEP7FyFeEBvdb8mhYkNrbqVoWCpkQkltnuBWVe
+          urCkKpQvPh3XYwGbPvsnAeM2XW60LZa2RXxlYNdFuK5PsURu0pnaxeBzcj/AR034rosCwPxL4e3n
+          5khJGIgqTq6q/nqO+TioqhZWNEmFnZYAxyVGnWkFUCcsYDTMcG5MF5DQrctfhlGiZSzxtjpLxZgp
+          loUkR6vpP0D7NZR4ExUfKMAtL6jVO7+MMtRfqAyJ9G6a39W0axZ1B8M3XUQcn9f6tpAG55rUNHPE
+          InMcO2XOt7dxxguzoK0Oy/hT/+d/87qTmPIB8+9SulcTiVYRcRp3xyyMx+Xqb110EA+sSGTOSiAa
+          mN97B/RPlH2v74xvOkuUagwW9V3OSHXY73U3t+bj6obeBMTeDaYisLttl79vdW7hd+bCAdcHbL41
+          rYeEYMaM5LiImJapHBiql+/BJezumd40zxAa+/wZScbPDi1S6dI18syKy0QLu+vGdExk3qLdiVPC
+          ZKGp5ehvZy/2X53Rj66/XZlELYKIyucOmjShs1QbeKgxam0+G+zpupMDPFPkJw4/t7eSQGbR/lvP
+          EHlbnZXGy5EltV5+QbhMzHQ/n0myp/Yy3Vz8xvvOkop//Y7SO423IE0hBIGT6WE6oW6xJsY+1gJW
+          M40ymnwkdo0FaQJSLeOHN25WPdnXQSGVHAq9VjPn+QLb0BfV+E+SeBll/9suQKDNr/b00tPim3T+
+          hXp9XrDtxlPqqYa6Tv+wGSN98WmEliRVCBwDDg2t4M0O9iwcLTydaBD9LYo7V1HJSuXZG+Q00u8d
+          N6bBZsH3PeAWcdaVmHmT4ISzoykO4eexKNSPUv8l9oQGAv5OTTvcztrMtU45b52XCcFA0KrtwXvQ
+          xLo8v9ma4ObqAb2q5SXms3K/XKgBmQArgbP0PvEIQrgKE2q18nIahIGNlT+P2E/5c9RsHG/n7y2f
+          X14S+aXNWc4l9UvKNEpUILc8M5KsI7Ej0f7I6cC9c6RrNgKpLXXtNuFMcRB8VOO2JPfGSuWIRcYa
+          /mClyNurIhy6LsgfwVkm8uWyR1g0ZQ28BCnEFVzlWyT0L6M1LbOff/i25mxu6LiXnFmWi94omd/q
+          wjafEYB/lxiDJ24jWQLd/P3vu4YOjdGsLHXv42XZSbte9BIz3M++Lfu+KcsZ428xvy90Kir42Lhq
+          WqcBqiCCOvO4QHrCTPttHejzMznANLnnfNFNasFeUcxh1rnJ3XVjgQt97yC4HIyMexGsWc69iHvY
+          C/gMlRHWBD0tTyeR1ZzBPxxqc1ftUT7UnwCW4D7j/eE2ETn1JCwU5c+iKlbgnrGvIEyREfyw3TB+
+          IwlA+TwbkdKAHYDbcHx7weFiHN/FO5QxK8yFP+QD8mhE+gBeMgClFjiR6p2Y9HcAKuH+4a0uhiLn
+          jwDJWD5xD8fYaW9McqA50IpgxJ0lrV4eOOccg4EwLoG/NU5mrcqSrILjViwEOGMUJ0d+LZg4N5KP
+          YMr1ZD9OIFvYh7MyVnCrzlccuHWjkYOBys0yqrVeMGs/oQFl8GTPkFwSQIXQSfb8uyTldjSbG+Hz
+          uwaCLo/2ok3jg8d3/n7yzx0fo4PMG6BnKQKH/5QHF8TcqmMT6+3SqDTufkfEhw6jIoytv+xEER/T
+          BGdO953vbfPP0unyc5qLJ3Fy9RFnz9VT4zZD7TScOxt7qf1S8UCW+9jg1vjn1WmxbM1At/E1T+rq
+          cl9qAsrPs13jdGooc/bbPpr+3MfR89tnk4HWm2jIZ14rvzdwM1+koSCUplYyqc1r4imrN4Fg3XyR
+          ZgoSb8N8a8LK5vmmh0KxCPd9oqmptj6ubZwhhzpcOqLrzD8YMKypbXLB2mbhSSAaYjAlef8jd+75
+          VYOPaqScpUMZwFpb8OpnU3zCZBCNnebzbxL/VYr/I6FsY5iFjIy4EQ9ejcV4KcndLjIEM/XeTsaf
+          N/6vv3lv524l/u/evZ3+Kv7vS1wP3zAUTkDTmuT3NSZqr3VZFNP7Gxs5zCth3nOReZONcHrFhKL3
+          RKnWz8NpsfhbekE+0Lv32U6219rs7w6nLXtXDrZrt4H1hcOSH+xH9Wf/4T5tyVn2Q0A62ffwB0xb
+          e62n/W7/kl57Q/9frtM/v7Tc4fdDNPV+WBQia+21zPfgtHyc3SqflD+8yMJhrI7O/CZOCvcAqUYK
+          mmsnq8V/22vd3a7c+/teq+9uRcmw8hLd+bvfrVLl7JZq3iSRN4+KUnFsLNtr/eH4uL+7uXvnoLWx
+          bCGbTYVs3bt7b3+3WsjDDTMG3jhu2IHU2djADOjvv19fB8BQdM3WgjxYX2+aMjvkVPfBwTFfzjGt
+          YWK3trpb20G42bvTpf+DfrDZ7QdbvR36t3JzXe7+I3i63e9u7tDj7qZ5n9+2f65vyXt3+t07u0HY
+          733Tpf/14WZvF2+Xb67LXfrm7m53a2uJsnd3uzv9Jd7b3O3e/bA2YKoebshaf7T2wfwfKRb/ifz/
+          zlaZ/2/Rv6v4798S//+S7BxMA2YuSe0CCKXb2cbx9tHjQ48fesxiZ7t7hxbnTnfHLCRede7vdb7x
+          D8Pt5lfy+PjwzvFWYyX37nW3N4PwTtcwHuZF7s/1nVIV6CKyPIS0nUyj8GqJHt47+GZ/Tg/v9rv3
+          toMnOzvd7d3gye4W/lqiO3cP7x0+3m0eM7+oJ/fkxw5zr3InwFaCPEmvb6QfmpEjvwxxtpVxdMyI
+          FOklOnh0dLx9fNDYnK0dbsD2Dlgz+rlcBx9vH+weNXewVNSTu9tSPrHdnUoHpW/CGz9LJ3RM8eNe
+          cIAf3wS7/e5uP7i3i3+f3OE/Drb4L3z0Df97bwGT/xD5fxJPJ+F0PUxuhtN4/c3Wjr8RfAz3v5X/
+          9+9u1eT/zbubK/7/Rfj/tzSlRtEmNtsjFhIlgxQBQXutWTFa3219S2QVDkmMi99E60CO+ITdQheI
+          UyjtUjCCx17rz7fooHYBOrFk6VLcJ7aUSZqkg8sslUOTjyiFZFx/dB79lmwHH7b+X32UDPjB63+r
+          f2el/6/W/2r9/wvWP9us8/UEotkGjqaj/ON2/eXXPzb78v5/d7t/Z7X+v8j6z9TdK9fVII5ZYvMS
+          RyvxT3r6tKUo2s4WJs+NW1bvWbrPOL+PYe/ideEV/rvV9Rta/xsSyfOpK3+59d+/d6ey/rfvbK7W
+          /5de/w/Fz1KWPu125xetR3/YfLy1faf/UOjh0WpF/7us/8+z8y+7/9+rrf/+1mr9/9b2/yeMb7OS
+          An5L1/ksHg+BqDkcR72rIv9n1HHb+t/a3Kms//69ndX+/0Uuk+VU3NfiYbsFJGCjwSMOAQhp4tFl
+          fL9au727PZxzcPgsu17ar9PsovdzVJxnyLfQE2hUU5xfxGbvm97WdrmM9yv28MUvXfnTLJ3C5THK
+          /wXrf9M90/W/ubWy/32ZC+tVaeDnN5Mwu8j31v82ebt1EawfIhCtZ42BL8+O13fXDGeY5dG+/Pq3
+          PbhMrulSR36QHssQe+loFA9ILlit6v+HrywaR2EercPDMu9Nhl9+/9/c2b5XW//032r9f4nrD00g
+          Tm82e1u9v62fR0W4tsbhY0omyI+dI1fAFFANwSxRvJ5ucPz86fNDC9+T5d3g3i8c6PNi/4WBY0Fi
+          cIZWxv1hzGEV3SrWNkK9EFskngKzIp2Q+DHQeNOcA6RMhp3oIkqGYXbDYRmQKug/ZUq9tbWvvnpM
+          7Q/ydFRck95yn4sIZlOJgNMyNIndeQSLfmBCs776am3tD38IfrgMi//6z/+RB0l0vba2Hnz11UGt
+          5z3NpIdgNk3Z4+OfMi6k5EgXILNyXlKTZjDvIcJDSkTnJWFczkFGGiEGnIPBeDZkdBYR2rocwjDL
+          EPxDyvqlgeHjZGl0T2OscPdGo4oNejiynF5n7FUt0VhSn0k8aFJkSqq/G45OY0TiHg+DbSvAXeGp
+          g1F4LGOIED/19u4Gp5fptQm+4IA+5CkPBwWJfH7u8mvEJnHsOJoxNIlZ3W3uxxBBipKk0wJpWg9x
+          Lx26tr1SKPrCaa+8flSJFt1g3A0hvsQ9oju/AAAtR4e0DZyJjX3g9YN4gt+7NiObDi0tlwnS1g31
+          E+DPpomQbN5V5ERNwR5kM+BOces03NqsHjTuRIedwUJe936Jp6+79PPeL6+5mNe9LMxeG3RRIqp/
+          xLRkJJDzyT+e7neDw2g0phne2Qbg/WN6vMWrGWDIqJ0RaaQ6hBSecZrHjFYgYqRoHqmRoA7Uzikg
+          JfqfMW9y9tJnNC9O04fypB9HtUWPrnA8KUgRmMChxqf2gkN+Aw2+ijgu9dIExJ/PioDoQO9xjKPC
+          6ev68MIKmeSLS32m1RiqjwtqXi/gZsliAxUxKos02IsYKrUUky/4xQb2gIOa08KkiEILdG3S4IVT
+          rnwQZ4Mx5/bjiFYfHLnw8M645ieWD6JixjVCQDnN1TAKzV9GZZP+CtfkGNLiMktnF5fB6++0DcXb
+          QgkDIyXl4l6PWFuUuHFUdmTS5EkkLIPSyIP2a/y1gfD+jf0pp37ZeJIOwvGGsNHXSJqdFmY5g4pG
+          cipr+DfQF3rBc4QIX8e5cglaYEL4weup3+JJmMzkg6eakykcX4c3SP0QEi86p2k0qDr6WWXwzG7B
+          s8fjjewkEpUMZEj0z205XZkmQYv0usBYPcgATFP32hjBgsdS9Iar7TWiqB30ho6ZoCDwEqLtAzFq
+          m33OZQFqQvFX0ZSenyAlpIIpDCTz7Dkwf4YRrycmYVp7PuVyZ3WKURuyijBcH0hmBIBCbydRYGIT
+          b00yOcaTemTJCfRsidYtP9m5HNnlusois2ziwq02jRrPJXnHdUTdE9A0WZUzf2/j72S7YaoVXnY7
+          yVrMCQs0obu2rCjBn+7pNp2MxjHRFfYmWUvM1rl1ZiiFDHKeMjvnpAFdYQPi6GkaMMNBSIJIGOmJ
+          WYC3d9kk4tjmY8PP5R4CjHIhAc5dYoEoOaPldWXAaZGXxolWB5o61lZwBSEi70HGivpvkgZiahNi
+          MGkC8U3QuzgntsTLU69DpkKO/Kc3r4P02iwbxarm+TbSTBaNaFovDYA1dga/C7kUZzYayZmumFZm
+          btOENnnHvQtZB9YA5FpL/N+NkTB9hohPMCKI4xdQDZQtpAp3UbPi3CrmpWRqMeLJCDxcqB+IpaZy
+          8BHt/SGnhiUlFxQUDa7MCHjMpAjPGdUml7Ura4XlQk3piKZJTjcLCU/CidI/dYLuckkAtBWG1guO
+          47daPBUtYaV2GZLMqkRtoBBS1B7K2gZcppTygElBJDA/W5Cui5yxeWlcLIwCEQSQIZ48f35GdWS6
+          3Z1y+GNpWzlntKncFznApajQ170oF6Ejyiev0Tv8Nn6N+eJpuyZhbIoYuxxdQJpEWVy08JKBjEeK
+          EEK5zYufZ5JJdaIKCKMgRJqah4SnGQYM7//3WTSLIMQzOWjTgFchgxMmvC80buMvIg6vVYZIigz9
+          WgowlK6HJrhRYkvzCEQuO0ZslhzGzuCxdQ17pzaPw+wCkAtcvQIh+LqNty2BxnQr8VZZUac8lZqZ
+          HITtGSouyTsGt4M31kuBi5ExQaVgILNpfZ/TvaQO4o0mnpqtcgEac8DCm4Fu5u8FHoF0x+tIZIxJ
+          LxCsw7AMj/dAGu3D40kKJsbHs0KmQx+W5kW5Y7m5qCcO+lY65OUnQUcYvCm/NbGUn6jCwCU0pasQ
+          1SGLonWOAS/zDXDigakP+yCU55S6oosSKp9gABK9RMCMHBQYVJsSQJZkFQSNi2fclXo2Kccqu8a/
+          vo7OJOIIF16BVuCpNugwHwIMo1gpsiSmM0OlIrOwss04NYIFk061Z8h2rbuppzVWJRbdtKZTxqQq
+          JMs2p592skz0luE3QQ43GNdrmi2w4QuoLoesrGCZ6GxYSHdWvybTGBRtVWXRBFlvvTCSNXJnuxXi
+          p2nz+CJze3/f7nqrwHXH282gQTLsDVGG4HHIbk8qCj0ZhbSmsDOydqDVH4cCAMaK0w+YYjVz8C4E
+          eBtdv4MBGqnr1Y0Ucs7xjiqvDUk5ZR0crY6wlEdWd+AdWyRYcHFIx7LaqLWTGaQe3nt6bCCRUPZ8
+          rSp+O3lKgXuQlINqgfTKc57HQ3pB8rA5+eWaeNSQRc1bxUFHWujzVHBvVFRlrZy4x7Tg3UZGo2t0
+          z5KcpVIPtkjwVvAyaAr0bDKFgCnLSIAPI6tIqJDJXLaqRPFqEqXGG0qmZqtevYYC9bpn+QXWl7lr
+          RTpf/6KPaMCgn2rZoBh9306msCyeapkdEjHs3JDyH/wSC19Xu0JuNX8gK4Go+C0nmEF4kgf/9Z//
+          E0mGfEvBJCouU6K//+ULkZ7CxefKLKrHF4mpwArcgJ42+YDCIIuZo1jRcAZ0kC6kIBEz97/7q5M8
+          WdYUqCYSfNJZLtt/YmRHg2/FG6fynCl2BqPJmzFlVgqYPzDKBGgGTnMqEYmsaGNUYbLOeNUkg8hf
+          QkbgYQqSKfgrETXtank+k5lg7mehqCCSVawtPntEE4mVQ7a4mGFdM0ofbRWkIF5nzCISUbuFBmBO
+          Qodf7L+4SzJYmOdEDMP1Kcx8sNtIPyYkIcbrU2BFVbr0M7+FEp5DdudmOp3FZxAgWnyD3esqMmC1
+          JX1ZiJNkpEu2+6QifzI/Rw2Q1Tl8b5jPU8g8tsoGEF2+rDNSx9VqoxwnHZmmSrZVqsKydLW06SLk
+          HJOwIguTSmnfwtqSBiNTH9RzWo35VR69AtOhNR29jfAoQu0OoTG08j6q89gfzZvhe9aScWaEAVpf
+          zqqdC0g5vsfsDyvKiKodqgWItiGaFbMsZGMQIkoV+ev6Mh2XJE7RXW9E5Mf7qMqoxzLxw2gQK9Ck
+          G25WqJ6WKUAlmIFRrnn2QafRW1pq9MJFBOEpgBF9wmZkUx5WhNlHfAJGY/YT5fpDSWsJoxqPbeEs
+          J3iAKbNVT2fZlJVrKgBi/jSLSUYrboI4r3bCH/hhFl6sF+m6sZrZzwyvkJdlbdJwXSeiebEsqkxY
+          6d9MWVEWplRcM70cARSYh9ZSu9ggeIHF+Xl0yUJ2SkOneosVxhn3Wb4x0M88XLzxu7kP2f6jOz/s
+          OqICBZ7rBksJlg0Er7WMjaG3gaTZjbCsl1McB0eiEYFnGQWQYenAiuscWJyIgkNZ5W7ZysYZj3ij
+          vkYwKzUQbLrOpYkhmK5l0YiBsVGFkEbQ5hpytovZwxowC9pcMOoj0qZn2MeGMQxckOJpi8k7Pg+x
+          JjCwbV99DC9oV/YOYDyIxPKcG6vLeQQhWE8WjIWIJdIsFDtyrmdBHl9S/Ql9VYN4TW5jmUYkl0gI
+          XoQtz+ziG9O4rMd6qHW7xFSyCtDG4nGJkerbMl8i4rAEQfsmZKC1NbYXS2LiivAvp1LR/TWPOH0N
+          dRghORVLr2NdrYnBJwwFqImIgi07pPqjEDUqycEDNk3RQ5h7hzzLHlKjLkM+VQoYF95mSYakzThn
+          Oj0oakBqW0IPCh3t8A0JOQzvtnZGO9WVIFSq+QWChR4JNpyS9v6/8GsgjRz9y/+ZLoC3+f/c2epX
+          z//vbq38f76g/5+QNKPcveNlnseA+CTW9C64SNOLMeMWT2ivSoCpTVIu/haSEcbzHXGG0GDNOzkG
+          YNLjGTahj6mCC8toZ6VNEdJpz6Qlsy7Ja8p+2q37tMJbnZWv0epaXatrda2u1bW6VtfqWl2ra3Wt
+          rtW1ulbX6lpdq2t1ra7VtbpW1+paXatrda2u1bW6VtfqWl2r69/m+r8VdXi6AKgCAA==
           SKYEOF
 
       # Writes the project's source files into the repository root so they can be browsed and read on GitHub.
