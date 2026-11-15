@@ -1,11 +1,11 @@
 # Skyrim Mod Manager
 
-**Skyrim Legendary Edition mod management for Android, with complete uninstall and fomod support.**
+**Skyrim Legendary Edition mod management for Android, with complete uninstall.**
 
 Skyrim Mod Manager installs mods straight from archives into your Skyrim `Data` folder and tracks every file each mod adds. That lets it uninstall a mod completely later: plugins, textures, meshes, scripts, and anything else it added. It also manages your plugin list and load order through `Plugins.txt` and `loadorder.txt`.
 
 > [!WARNING]
-> This is beta software that writes to your game folder. Back up your Skyrim folder before installing mods, and back up `Plugins.txt` and `loadorder.txt` before saving a load order for the first time.
+> This is beta software that writes to your game folder. Back up your Skyrim folder before installing mods, and back up `Plugins.txt` and `loadorder.txt` before saving a load order for the first time. The app also updates those files when you accept the plugin activation prompt, or when you enable, disable, or uninstall a mod, and saves a backup first.
 
 ## Current support
 
@@ -13,13 +13,25 @@ Skyrim Mod Manager targets Skyrim Legendary Edition running through an Android p
 
 Current capabilities include:
 
-- installing mods from `.zip`, `.7z`, and `.rar` archives;
+- installing mods from `.zip`, `.7z`, and `.rar` archives, or a single `.esp`, `.esm`, or `.esl` plugin file on its own;
+- installing several files at once, and opening archives straight from your file manager or the share menu;
 - FOMOD installer wizards, including option images, conditions, and selection rules;
 - complete uninstall, with a preview of exactly which files will be removed and restored;
 - enabling and disabling mods without deleting them;
 - per-mod file lists and total size;
 - plugin activation and load order editing through `Plugins.txt` and `loadorder.txt`;
 - automatic backups of both files whenever you save a load order;
+- plugins that follow their mods: the app offers to activate a mod's plugins after installing it, deactivates them when you disable the mod, restores them when you enable it, and removes them when you uninstall it;
+- a conflict viewer showing which mods overwrite the same files and which one wins;
+- in-place mod updates that remove only the files the new version no longer has;
+- a dependency check that reads plugin headers, flags missing, inactive, or misordered masters, and can fix the order;
+- search, sorting, renaming, versions, notes, and source links for installed mods;
+- restoring an earlier load order from the saved backups;
+- profiles that switch whole sets of mods and load orders, plus sharing a setup as text;
+- verification that every file of every mod is still present and unchanged;
+- a free-space check before installing;
+- a Skyrim.ini helper that turns on loose file loading;
+- a troubleshooting helper that switches mods off in steps to find the one causing a crash;
 - a warning before installing a mod that appears to need SKSE; and
 - a progress window during installs, uninstalls, and mod toggles.
 
@@ -67,7 +79,13 @@ Every build is signed with the same key, so a new APK installs over the old one 
 - FOMOD conditions that check for files outside `Data` (such as `skse_loader.exe`) see those files as missing.
 - If two mods overwrite the same file, uninstall or disable them in reverse order of installation.
 - Load order is edited manually. There is no automatic sorting.
-- Disabling a mod does not remove its plugin from `Plugins.txt`. Untick it on the Load order tab.
+- The dependency check reads plugin headers only. It does not sort the whole load order the way LOOT does.
+- Conflicts are decided by install order: the mod installed last wins a shared file. Mods installed before conflict tracking existed get an estimated install time.
+- An updated mod counts as the newest mod for conflict purposes.
+- Mod priority is install order. There is no drag-to-reorder priority list.
+- The app does not download mods. There is no built-in Nexus Mods browser.
+- The troubleshooting helper assumes the problem goes away with every mod off. Two mods that only misbehave together can fool it.
+- Profiles match mods by name.
 
 ## Building
 
