@@ -2,6 +2,7 @@ package com.example.skyrimmm
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -160,6 +161,22 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
     val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull().orEmpty() }
 
     LaunchedEffect(status) { if (status.isNotBlank()) snack.showSnackbar(status) }
+    val repo = remember { runCatching { ctx.packageManager.getApplicationInfo(ctx.packageName, PackageManager.GET_META_DATA).metaData?.getString("repo").orEmpty() }.getOrDefault("") }
+    var update by remember { mutableStateOf<UpdateInfo?>(null) }
+    var autoUpdate by remember { mutableStateOf(prefs.getBoolean("autoUpdate", true)) }
+
+    /** Asks GitHub for the newest release. A quiet check stays silent unless there is something newer. */
+    fun checkUpdates(manual: Boolean) {
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { Updater.latest(repo) }.getOrNull() }
+            when {
+                r == null -> if (manual) status = "Couldn't check for updates: no connection, or the releases aren't public."
+                Updater.isNewer(version, r.tag) -> update = r
+                else -> if (manual) status = "You have the latest version (v$version)."
+            }
+        }
+    }
+    LaunchedEffect(Unit) { if (autoUpdate) checkUpdates(false) }
     LaunchedEffect(dataUri, mods.size) { // measure mods installed before sizes were recorded
         val d = dataUri ?: return@LaunchedEffect
         if (mods.any { it.size < 0 }) {
@@ -336,7 +353,25 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
 
     prog?.let { ProgressDialog(it) }
 
-    if (showTools) ToolsDialog(onPick = { tool = it; showTools = false }, onClose = { showTools = false })
+    if (showTools) ToolsDialog(
+        onPick = { if (it == "update") checkUpdates(true) else tool = it; showTools = false },
+        onClose = { showTools = false }, autoCheck = autoUpdate,
+        onAutoCheck = { autoUpdate = it; prefs.edit().putBoolean("autoUpdate", it).apply() })
+    update?.let { u ->
+        AlertDialog(
+            onDismissRequest = { update = null }, title = { Text("Update available: ${u.tag}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("You have v$version. ${u.tag} is the latest release.")
+                    val notes = u.notes.replace(Regex("[#*`]"), "").trim()
+                    if (notes.isNotBlank()) Text(notes.take(700) + if (notes.length > 700) "…" else "", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { update = null; runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u.apkUrl ?: u.url))) } }) { Text("Download") }
+            },
+            dismissButton = { TextButton(onClick = { update = null }) { Text("Later") } })
+    }
     val run: TaskRunner = { t, b -> task(t, b) }
     when (tool) {
         "verify" -> dataUri?.let { VerifyDialog(mgr, it, mods) { tool = null } }

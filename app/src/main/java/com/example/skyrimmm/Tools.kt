@@ -26,12 +26,13 @@ import kotlinx.coroutines.withContext
 typealias TaskRunner = (String, () -> String) -> Unit
 
 @Composable
-fun ToolsDialog(onPick: (String) -> Unit, onClose: () -> Unit) {
+fun ToolsDialog(onPick: (String) -> Unit, onClose: () -> Unit, autoCheck: Boolean = true, onAutoCheck: (Boolean) -> Unit = {}) {
     val items = listOf(
         Triple("verify", "Verify installed mods", "Check that every file of every mod is still there"),
         Triple("profiles", "Profiles and setups", "Save, switch, share or import mod and load order setups"),
         Triple("ini", "Skyrim.ini helper", "Turn on loose file loading"),
-        Triple("trouble", "Troubleshoot crashes", "Find the mod causing a problem by switching mods off in steps"))
+        Triple("trouble", "Troubleshoot crashes", "Find the mod causing a problem by switching mods off in steps"),
+        Triple("update", "Check for updates", "See whether a newer version of the app is available"))
     AlertDialog(
         onDismissRequest = onClose, title = { Text("Tools") },
         text = {
@@ -40,6 +41,10 @@ fun ToolsDialog(onPick: (String) -> Unit, onClose: () -> Unit) {
                     ListItem(colors = ListItemDefaults.colors(containerColor = Color.Transparent), modifier = Modifier.clickable { onPick(key) },
                         headlineContent = { Text(title) }, supportingContent = { Text(hint) })
                 }
+                ListItem(colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    headlineContent = { Text("Check for updates when the app opens") },
+                    supportingContent = { Text("Looks up the latest release on GitHub") },
+                    trailingContent = { Switch(checked = autoCheck, onCheckedChange = onAutoCheck) })
             }
         },
         confirmButton = { TextButton(onClick = onClose) { Text("Close") } })
