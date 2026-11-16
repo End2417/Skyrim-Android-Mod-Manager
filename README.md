@@ -32,6 +32,7 @@ Current capabilities include:
 - a free-space check before installing;
 - a Skyrim.ini helper that turns on loose file loading;
 - a troubleshooting helper that switches mods off in steps to find the one causing a crash;
+- an update check that looks for a newer GitHub release when the app opens (it can be switched off in Tools);
 - a warning before installing a mod that appears to need SKSE, and one for mods that look like Special Edition content (plugin headers, the ESL flag, BSA version, 64-bit SKSE plugins, SE meshes, and BC7 textures); and
 - a progress window during installs, uninstalls, and mod toggles.
 
@@ -85,12 +86,13 @@ Every build is signed with the same key, so a new APK installs over the old one 
 - An updated mod counts as the newest mod for conflict purposes.
 - Mod priority is install order. There is no drag-to-reorder priority list.
 - The app does not download mods. There is no built-in Nexus Mods browser.
+- The update check only works if the repository's releases are public. It reads the latest published release and offers to download it; it does not install anything itself.
 - The troubleshooting helper assumes the problem goes away with every mod off. Two mods that only misbehave together can fool it.
 - Profiles match mods by name.
 
 ## Building
 
-The project builds with GitHub Actions. Before the first run, add two repository secrets, `KEYSTORE_BASE64` and `KEYSTORE_PASSWORD`, which hold the app's signing key. The key is never stored in the repository. Run the **Build Skyrim Mod Manager APK** workflow from the **Actions** tab, or push a commit. Each successful run attaches a signed APK to the run as a downloadable artifact named after its version (for example `SkyrimModManager-v1.4.5.apk`). Releases are created by hand from the Releases page.
+The project builds with GitHub Actions. Before the first run, add two repository secrets, `KEYSTORE_BASE64` and `KEYSTORE_PASSWORD`, which hold the app's signing key. The key is never stored in the repository. Run the **Build Skyrim Mod Manager APK** workflow from the **Actions** tab, or push a commit. Each successful run attaches a signed APK to the run as a downloadable artifact named after its version (for example `SkyrimModManager-v1.3.6.apk`). Releases are created by hand from the Releases page.
 
 The source files in this repository are written by the workflow on every run, from the copy kept inside `.github/workflows/build.yml`. To change the app, edit that file. Changes made directly to the other files are overwritten by the next run.
 
@@ -101,6 +103,10 @@ Bug reports, compatibility notes, and documentation corrections are welcome. Whe
 ## License
 
 This project does not have a license yet. Until one is added, all rights are reserved by the author.
+
+## AI disclosure
+
+Most of this project's code, build workflow, and documentation, including this README, were written with the help of an AI assistant (Claude, made by Anthropic), working from the maintainer's requests. AI-written code can contain mistakes that are not obvious, and it has not been independently audited. Because the app changes files in your game folder, back up your game before using it. Bug reports and corrections are welcome.
 
 ## Disclaimer
 
