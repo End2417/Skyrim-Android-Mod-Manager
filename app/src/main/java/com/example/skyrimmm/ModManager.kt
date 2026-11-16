@@ -112,10 +112,16 @@ class ModManager(private val ctx: Context) {
                         if (readmeNeedsSkse(decodeText(s.readUpTo(200_000)))) { skse += "A readme ($file) says it requires SKSE"; readme = true }
                     }
                     !sePlugin && (low.endsWith(".esp") || low.endsWith(".esm") || low.endsWith(".esl")) && plugins++ < 20 -> {
+                        // The ESL flag and a form version of 44 or higher count. The header version (such as 1.70) does not:
+                        // it is common in plugins that work fine in LE.
                         parsePluginHeader(file, s)?.let { info ->
                             when {
-                                info.isLight -> { se += "Plugin $file is flagged ESL, which only Special Edition supports"; sePlugin = true }
-                                info.hedr >= 1.0f || info.formVersion >= 44 -> { se += "Plugin $file was saved for Special Edition (header version ${"%.2f".format(info.hedr)})"; sePlugin = true }
+                                info.isLight || low.endsWith(".esl") -> {
+                                    se += "Plugin $file is a light (ESL) plugin, which only Special Edition supports"; sePlugin = true
+                                }
+                                info.formVersion >= 44 -> {
+                                    se += "Plugin $file was saved for Special Edition (form version ${info.formVersion}; Legendary Edition uses 43)"; sePlugin = true
+                                }
                                 else -> {}
                             }
                         }
