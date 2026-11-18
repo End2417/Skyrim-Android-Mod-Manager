@@ -21,6 +21,7 @@ Current capabilities include:
 - per-mod file lists and total size;
 - plugin activation and load order editing through `Plugins.txt` and `loadorder.txt`;
 - automatic backups of both files whenever you save a load order;
+- "Sort (LOOT rules)" on the Load order tab: shows what would move (and why) using the groups and "load after" rules of the LOOT Legendary Edition masterlist, with the Special Edition masterlist as a fallback for plugins the first list does not know. Nothing changes until you apply it and press Save. The masterlists are bundled, and "Update rules" downloads the newest ones;
 - plugins that follow their mods: the app offers to activate a mod's plugins after installing it, deactivates them when you disable the mod, restores them when you enable it, and removes them when you uninstall it;
 - a conflict viewer showing which mods overwrite the same files and which one wins;
 - in-place mod updates that remove only the files the new version no longer has;
@@ -29,11 +30,12 @@ Current capabilities include:
 - restoring an earlier load order from the saved backups;
 - profiles that keep separate sets of enabled mods and load orders: the active profile is shown on the main screen, every change you make is saved into it, new profiles can start with every mod off, and a setup can be shared as text;
 - verification that every file of every mod is still present and unchanged;
+- adopting mods that are already in `Data` by picking their archive, and a list of unmanaged files that no installed mod owns, which can be moved out into a backup folder;
 - a free-space check before installing;
 - a Skyrim.ini helper that turns on loose file loading;
 - a troubleshooting helper that switches mods off in steps to find the one causing a crash;
 - an update check that looks for a newer GitHub release when the app opens (it can be switched off in Tools);
-- a warning before installing a mod that appears to need SKSE, and one for mods that look like Special Edition content (plugin headers, the ESL flag, BSA version, 64-bit SKSE plugins, SE meshes, and BC7 textures); and
+- a warning before installing a mod that appears to need SKSE, and one for mods that look like Special Edition content (the plugin form version, the ESL flag, BSA version, 64-bit SKSE plugins, SE meshes, and BC7 textures), with an option to convert an SE mod to Legendary Edition on the phone (plugins, SE archives, meshes and textures) and install the result, plus a saved conversion report for each converted mod; and
 - a progress window during installs, uninstalls, and mod toggles.
 
 Archive support depends on the actual archive format. Zips using LZMA, Deflate64, or BZip2 compression are supported. RAR support covers RAR4 only. Password-protected, multi-part, and RAR5 archives are rejected with an error message.
@@ -48,7 +50,22 @@ When a mod is installed, the app records every file it writes and every folder i
 
 Before you confirm, **Show details** lists exactly what will be removed and restored.
 
-The app only tracks mods it installed itself. Mods copied into `Data` by hand will not appear in the list.
+The app only tracks mods it installed itself or adopted (**Tools > Adopt an existing mod**, using the mod's original archive). Mods copied into `Data` by hand do not appear in the list until then. If a mod's files were left in `Data` after an earlier install, reinstalling it makes the app treat identical leftover files as part of the mod, asks about different ones, and the uninstall dialog has an option to remove overwritten files instead of restoring them. **Tools > Find unmanaged files** lists everything else.
+
+## Converting Special Edition mods
+
+When the app thinks a mod is for Skyrim Special Edition, the warning dialog offers **Convert to LE**. The conversion runs on your phone and the result is installed like any other mod:
+
+- plugins are converted to the Legendary Edition format (form version, ESL flag, record layout for the supported records);
+- SE archives (BSA) are extracted into loose files; they are not packed again;
+- meshes are converted from the SE format to the LE format, and BC7 textures are converted to a format LE can read, with an optional largest texture size to save memory;
+- a report lists what was converted and what needs attention, and stays available from the mod's menu (**Conversion report**).
+
+Not converted: animations (`.hkx`), SKSE plugins, SPID/KID/SkyPatcher files, plugin merging, missing masters, and compiled scripts that use SE-only features. These are listed in the report. Large mods can take several minutes, so keep the app open while it runs.
+
+## Sorting the load order
+
+**Sort (LOOT rules)** on the Load order tab previews what would move and why. It uses the groups and "load after" rules of the LOOT Legendary Edition masterlist, and falls back to the Special Edition masterlist for plugins the first list does not know, since the app can convert SE mods. Official files stay first, master-flagged plugins stay before regular ones, and every plugin stays after its masters. Nothing changes until you press **Apply** and then **Save**, which makes the usual backup. **Update rules** downloads the newest masterlists; the app also ships with copies of them, so sorting works offline.
 
 ## Compatibility environments
 
@@ -76,12 +93,14 @@ Every build is signed with the same key, so a new APK installs over the old one 
 
 ## Known limitations
 
+- Converting Special Edition mods is a best effort: SKSE plugins, skinned or complex meshes, some texture formats, animations and records beyond the ones it handles are reported but not converted. Read the conversion report before playing with a converted mod.
 - SKSE mods are not supported. The SKSE warning is a best guess based on file names, compiled scripts, installer configs, and readmes, so it can be wrong in both directions.
 - FOMOD conditions that check for files outside `Data` (such as `skse_loader.exe`) see those files as missing.
+- Adopting a mod cannot restore files the mod replaced in the past, because their originals were never saved. The unmanaged-file list can include game files the app does not know about, so check it before moving anything.
 - If two mods overwrite the same file, uninstall or disable them in reverse order of installation.
-- Load order is edited manually. There is no automatic sorting.
+- Sorting follows LOOT's masterlist groups and rules only. It does not compare plugin records the way the full LOOT does, plugins the lists do not know keep their order, and rules whose conditions the app cannot check (plugin versions, checksums) are skipped.
 - The Special Edition warning is a best guess. A mod that converted its plugin but still ships SE meshes or textures may be flagged, and some SE mods give no sign at all.
-- The dependency check reads plugin headers only. It does not sort the whole load order the way LOOT does.
+- The dependency check reads plugin headers only.
 - Conflicts are decided by install order: the mod installed last wins a shared file. Mods installed before conflict tracking existed get an estimated install time.
 - An updated mod counts as the newest mod for conflict purposes.
 - Mod priority is install order. There is no drag-to-reorder priority list.
@@ -92,13 +111,25 @@ Every build is signed with the same key, so a new APK installs over the old one 
 
 ## Building
 
-The project builds with GitHub Actions. Before the first run, add two repository secrets, `KEYSTORE_BASE64` and `KEYSTORE_PASSWORD`, which hold the app's signing key. The key is never stored in the repository. Run the **Build Skyrim Mod Manager APK** workflow from the **Actions** tab, or push a commit. Each successful run attaches a signed APK to the run as a downloadable artifact named after its version (for example `SkyrimModManager-v1.3.6.apk`). Releases are created by hand from the Releases page.
+The project builds with GitHub Actions. Before the first run, add two repository secrets, `KEYSTORE_BASE64` and `KEYSTORE_PASSWORD`, which hold the app's signing key. The key is never stored in the repository.
 
-The source files in this repository are written by the workflow on every run, from the copy kept inside `.github/workflows/build.yml`. To change the app, edit that file. Changes made directly to the other files are overwritten by the next run.
+The app's source is kept in a zip named after the version, for example `SkyrimModManager-v1.4.0-source.zip`, in the repository root. To change the app, upload the zip for the new version (same folder layout: `build.gradle.kts`, `settings.gradle.kts`, `app/`) and then run the **Build Skyrim Mod Manager APK** workflow from the **Actions** tab (**Run workflow**). The build never starts on its own when files change. The workflow then:
+
+1. unpacks the zip that matches `APP_VERSION` into the repository root, replacing the previous copy of the files it contains;
+2. commits the unpacked files so the source can be browsed on GitHub;
+3. builds a signed APK and attaches it to the run as a downloadable artifact named after its version (for example `SkyrimModManager-v1.4.0.apk`); and
+4. after a successful build, removes the zip from the repository. If the build fails the zip stays, so you can run the workflow again.
+
+Change the version in `APP_VERSION` at the top of the workflow file, and upload the zip with that version in its name to the repository root before each run. Releases are created by hand from the Releases page. Edit the unpacked files only through a new zip; direct changes to them are overwritten by the next run.
 
 ## Contributing
 
 Bug reports, compatibility notes, and documentation corrections are welcome. When reporting a problem, include your Android version, the mod's name and a link to its page, and the exact error message shown by the app.
+
+## Credits
+
+- The load order sorter and the bundled masterlists use data from the [LOOT](https://loot.github.io/) project ([Legendary Edition](https://github.com/loot/skyrim) and [Special Edition](https://github.com/loot/skyrimse) masterlists). Check their repositories for their license terms.
+- The Special Edition to Legendary Edition converter is the maintainer's own SE2LE tool, built into this app.
 
 ## License
 
