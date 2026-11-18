@@ -1,0 +1,1361 @@
+# Reduced copy of the LOOT masterlist: only the groups and the group / load-after data of each plugin are kept.
+groups:
+  - name: 'Update.esm'
+  - name: 'Unofficial Patches'
+    after: [ 'Update.esm' ]
+  - name: 'DLC'
+    after: [ 'Unofficial Patches' ]
+  - name: 'New Lands & Optimisers'
+    after: [ 'DLC' ]
+  - name: 'Underrides'
+    after: [ 'New Lands & Optimisers' ]
+  - name: 'default'
+    after: [ 'Underrides' ]
+  - name: 'Ordinator'
+    after: [ 'default' ]
+  - name: 'Pre-Patchus Maximus Patches'
+    after: [ 'Ordinator' ]
+  - name: 'Immersive Citizens'
+    after: [ 'Pre-Patchus Maximus Patches' ]
+  - name: 'Morrowloot'
+    after: [ 'Immersive Citizens' ]
+  - name: 'Requiem'
+    after: [ 'Morrowloot' ]
+  - name: 'Open Cities Skyrim'
+    after: [ 'Requiem' ]
+  - name: 'Alternate Start & Requiem'
+    after: [ 'Open Cities Skyrim' ]
+  - name: 'Skyrim Unlocked'
+    after: [ 'Alternate Start & Requiem' ]
+  - name: 'Cell Music'
+    after: [ 'Skyrim Unlocked' ]
+  - name: 'Lighting'
+    after: [ 'Cell Music' ]
+  - name: 'Dynamic Patches'
+    after: [ 'Lighting' ]
+  - name: 'Map Markers'
+    after: [ 'Dynamic Patches' ]
+  - name: 'ASIS'
+    after: [ 'Map Markers' ]
+  - name: 'Late Patches'
+    after: [ 'ASIS' ]
+  - name: 'SkyProc Unified Manager'
+    after: [ 'Late Patches' ]
+  - name: 'Reproccer Patches'
+    after: [ 'SkyProc Unified Manager' ]
+  - name: 'Post-Reproccer Patches'
+    after: [ 'Reproccer Patches' ]
+  - name: 'Maps & LOD'
+    after: [ 'Post-Reproccer Patches' ]
+plugins:
+  - name: 'Update.esm'
+    group: 'Update.esm'
+  - name: 'Dawnguard.esm'
+    group: 'DLC'
+  - name: 'HearthFires.esm'
+    group: 'DLC'
+    after:
+      - 'Dawnguard.esm'
+  - name: 'Dragonborn.esm'
+    group: 'DLC'
+    after:
+      - 'Dawnguard.esm'
+      - 'HearthFires.esm'
+  - name: 'HighResTexturePack01.esp'
+    group: 'DLC'
+  - name: 'HighResTexturePack02.esp'
+    group: 'DLC'
+    after:
+      - 'HighResTexturePack01.esp'
+  - name: 'HighResTexturePack03.esp'
+    group: 'DLC'
+    after:
+      - 'HighResTexturePack01.esp'
+      - 'HighResTexturePack02.esp'
+  - name: 'Unofficial (Skyrim|Dawnguard|Hearthfire|Dragonborn) Patch.esp'
+    group: 'Unofficial Patches'
+  - name: 'Unofficial Skyrim Legendary Edition Patch.esp'
+    group: 'Unofficial Patches'
+    after:
+      - 'Lanterns Of Skyrim - All In One - Main.esm'
+  - name: 'Unofficial High Resolution Patch.esp'
+    group: 'Unofficial Patches'
+  - name: 'Occlusion.esp'
+    group: 'Maps & LOD'
+    after:
+      - 'DynDOLOD.esp'
+  - name: 'Race Records Master( - mine)?\.esp'
+    group: 'Post-Reproccer Patches'
+  - name: 'dD - Realistic Ragdoll Force - (Realistic|Reduced|Medium|High)\.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Realistic Weapon Positions.esp'
+    group: 'Reproccer Patches'
+  - name: 'AOS.esp'
+    after:
+      - 'WetandCold.esp'
+      - name: 'RealisticWaterTwo.esp'
+        condition: 'not file("AOS2_RealisticWaterTwo Patch.esp") and not file("WAO-.*RWT.*\.esp") and not active("Requiem.esp")'
+  - name: 'AOS_Reduced_Reverb_Addon.esp'
+    group: 'Reproccer Patches'
+  - name: 'AOS2_WAF Patch.esp'
+    after:
+      - 'AOS2_GDO Patch.esp'
+  - name: 'Player Home Tavern Music( - (Dragonborn|Hearthfire|Legendary))?\.esp'
+    group: 'Cell Music'
+  - name: 'Player Home Tavern Music - (Dragonborn|Hearthfire)\.esp'
+    after:
+      - 'Player Home Tavern Music.esp'
+  - name: 'Player Home Tavern Music - Dragonborn.esp'
+    after:
+      - 'Player Home Tavern Music - Hearthfire.esp'
+  - name: 'ClimatesOfTamriel.esm'
+    after:
+      - 'Skyrim Project Optimization.esm'
+      - 'Skyrim Project Optimization - Dawnguard.esm'
+      - 'Skyrim Project Optimization - Dragonborn.esm'
+  - name: 'WetandCold.esp'
+    after:
+      - 'SKSE Hotkeys.esp'
+  - name: 'WetandCold - Ashes.esp'
+    after:
+      - 'SKSE Hotkeys.esp'
+  - name: 'Skyrim Immersive Creatures.esp'
+    after:
+      - 'Sleeping Dangers - Sands of Time.esp'
+      - 'SleepingDangers-SandsofTime.esp'
+  - name: 'Better Vampires.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'RealisticNeedsandDiseases.esp'
+    after:
+      - '3DNPC.esp'
+      - 'TradeRoutes.esp'
+  - name: 'RND_(BabettesFeast|Dawnguard|DestructibleBottles|Dragonborn|DrinkingFountains|ETaC|HearthFires|Requiem|RWS|UniqueBoozeBottles|USKP)-Patch\.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'SkyRe_Main.esp'
+    after:
+      - 'Scoped Bows.esp'
+  - name: 'SkyRe_EnemyScaling.esp'
+    after:
+      - 'Immersive Weapons.esp'
+  - name: 'WTF.esp'
+    group: 'Late Patches'
+  - name: 'Realistic Wildlife Loot - Realistic - (Hearthfires|Dragonborn) patch\.esp'
+    after:
+      - 'Realistic Wildlife Loot - Realistic - Dawnguard patch.esp'
+  - name: 'Realistic Wildlife Loot - Realistic - Dragonborn patch.esp'
+    after:
+      - 'Realistic Wildlife Loot - Realistic - Hearthfires patch.esp'
+  - name: 'Realistic Wildlife Loot - Reduced - (Hearthfires|Dragonborn) patch\.esp'
+    after:
+      - 'Realistic Wildlife Loot - Reduced - Dawnguard patch.esp'
+  - name: 'Realistic Wildlife Loot - Reduced - Dragonborn patch.esp'
+    after:
+      - 'Realistic Wildlife Loot - Reduced - Hearthfires patch.esp'
+  - name: 'AmazingFollowerTweaks.esp'
+    after:
+      - 'Inigo.esp'
+  - name: 'UFO - Ultimate Follower Overhaul.esp'
+    after:
+      - 'brhucefollower.esp'
+      - 'brhucelegacy.esp'
+      - 'EMCompViljaNarphousHeadPatch.esp'
+      - 'EMCompViljaSkyrim.esp'
+      - 'EMCompViljaSkyrimBodyPatch.esp'
+      - 'EMViljaInSolstheimAddOn.esp'
+      - 'EMViljangelinaPatch.esp'
+      - 'EMViljessicaPatch.esp'
+      - 'PC Exclusive Animation Path - Vilja.esp'
+  - name: 'BetterQuestObjectives.esp'
+    group: 'Underrides'
+  - name: 'BetterQuestObjectives-AMBSkyforgePatch.esp'
+    after:
+      - 'ESFCompanions.esp'
+  - name: 'BetterQuestObjectives-ESFCompanionsPatch.esp'
+    after:
+      - 'Brevi_MoonlightTales.esp'
+  - name: 'BetterQuestObjectives-RequiemPatch.esp'
+    after:
+      - 'ESFCompanions.esp'
+  - name: 'AMatterOfTime.esp'
+    after:
+      - name: 'FISS.esp'
+        condition: 'version("AMatterOfTime.esp", >=, "2")'
+  - name: 'Warburg''s 3D Paper World Map - Texture [12]\.esp'
+    group: 'Alternate Start & Requiem'
+  - name: 'Warburg''s 3D Paper World Map - (dawnguard|Dragonborn)\.esp'
+    group: 'Map Markers'
+  - name: 'Book Covers Skyrim.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'BCS - OB Patch.esp'
+    after:
+      - 'Organized Books v2.0.esp'
+  - name: 'Arthmoor''s Skyrim Villages - All In One.esp'
+    after:
+      - 'Clockwork.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'Falskaar.esm'
+    group: 'New Lands & Optimisers'
+  - name: 'Wyrmstooth.esp'
+    group: 'New Lands & Optimisers'
+    after:
+      - 'Falskaar.esm'
+  - name: 'ETaC - Complete.esp'
+    after:
+      - name: '3DNPC.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("3DNPC.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("3DNPC.esp"))'
+      - name: 'BetterDocks-MP-DLC-Compatible.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("BetterDocks-MP-DLC-Compatible.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("BetterDocks-MP-DLC-Compatible.esp"))'
+      - name: 'CLARALUX.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("CLARALUX.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("CLARALUX.esp"))'
+      - name: 'Cutting Room Floor.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Cutting Room Floor.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Cutting Room Floor.esp"))'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'LeafRest OnePiece.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("LeafRest OnePiece.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("LeafRest OnePiece.esp"))'
+      - name: 'Populated Cities Towns Villages Legendary.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Populated Cities Towns Villages Legendary.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Populated Cities Towns Villages Legendary.esp"))'
+      - name: 'RiverwoodHuntingCabin.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("RiverwoodHuntingCabin.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("RiverwoodHuntingCabin.esp"))'
+      - name: 'RiverwoodHuntingCabinSE.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("RiverwoodHuntingCabinSE.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("RiverwoodHuntingCabinSE.esp"))'
+      - name: 'RLO - Exteriors.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("RLO - Exteriors.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("RLO - Exteriors.esp"))'
+      - name: 'Rorikstead Wagons.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Rorikstead Wagons.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Rorikstead Wagons.esp"))'
+      - name: 'Skyrim Bridges.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Skyrim Bridges.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Skyrim Bridges.esp"))'
+      - name: 'Tamriel Reloaded HD.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Tamriel Reloaded HD.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Tamriel Reloaded HD.esp"))'
+      - name: 'Verdant - A Skyrim Grass Plugin.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Verdant - A Skyrim Grass Plugin.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Verdant - A Skyrim Grass Plugin.esp"))'
+      - name: 'ViscousGrass.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("ViscousGrass.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("ViscousGrass.esp"))'
+      - name: 'WhiterunHoldForest.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("WhiterunHoldForest.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("WhiterunHoldForest.esp"))'
+  - name: 'ETaC - Darkwater Crossing.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Darkwater Crossing.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Darkwater Crossing.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'Skyrim Bridges.esp'
+        condition: '(is_master("ETaC - Darkwater Crossing.esp") and is_master("Skyrim Bridges.esp")) or (not is_master("ETaC - Darkwater Crossing.esp") and not is_master("Skyrim Bridges.esp"))'
+  - name: 'ETaC - Dawnstar.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Dawnstar.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Dawnstar.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'Populated Cities Towns Villages Legendary.esp'
+        condition: '(is_master("ETaC - Dawnstar.esp") and is_master("Populated Cities Towns Villages Legendary.esp")) or (not is_master("ETaC - Dawnstar.esp") and not is_master("Populated Cities Towns Villages Legendary.esp"))'
+  - name: 'ETaC - Kynesgrove.esp'
+    after:
+      - name: 'Cutting Room Floor.esp'
+        condition: '(is_master("ETaC - Kynesgrove.esp") and is_master("Cutting Room Floor.esp")) or (not is_master("ETaC - Kynesgrove.esp") and not is_master("Cutting Room Floor.esp"))'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Kynesgrove.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Kynesgrove.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+  - name: 'ETaC - Riverwood.esp'
+    after:
+      - name: '3DNPC.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("3DNPC.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("3DNPC.esp"))'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'LeafRest OnePiece.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("LeafRest OnePiece.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("LeafRest OnePiece.esp"))'
+      - name: 'Populated Cities Towns Villages Legendary.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("Populated Cities Towns Villages Legendary.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("Populated Cities Towns Villages Legendary.esp"))'
+      - name: 'RiverwoodHuntingCabin.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("RiverwoodHuntingCabin.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("RiverwoodHuntingCabin.esp"))'
+      - name: 'RiverwoodHuntingCabinSE.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("RiverwoodHuntingCabinSE.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("RiverwoodHuntingCabinSE.esp"))'
+      - name: 'RLO - Exteriors.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("RLO - Exteriors.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("RLO - Exteriors.esp"))'
+  - name: 'ETaC - Rorikstead.esp'
+    after:
+      - name: '3DNPC.esp'
+        condition: '(is_master("ETaC - Rorikstead.esp") and is_master("3DNPC.esp")) or (not is_master("ETaC - Rorikstead.esp") and not is_master("3DNPC.esp"))'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Rorikstead.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Rorikstead.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'Rorikstead Wagons.esp'
+        condition: '(is_master("ETaC - Rorikstead.esp") and is_master("Rorikstead Wagons.esp")) or (not is_master("ETaC - Rorikstead.esp") and not is_master("Rorikstead Wagons.esp"))'
+  - name: 'ReProccerDragonborn.esp'
+    group: 'Reproccer Patches'
+  - name: 'Skyrim Project Optimization.esm'
+    group: 'New Lands & Optimisers'
+  - name: 'Skyrim Project Optimization - No Homes.esm'
+    group: 'New Lands & Optimisers'
+  - name: 'Skyrim Project Optimization - Dawnguard.esm'
+    group: 'New Lands & Optimisers'
+    after:
+      - 'Skyrim Project Optimization.esm'
+      - 'Skyrim Project Optimization - No Homes.esm'
+  - name: 'Skyrim Project Optimization - Dragonborn.esm'
+    group: 'New Lands & Optimisers'
+    after:
+      - 'Skyrim Project Optimization.esm'
+      - 'Skyrim Project Optimization - No Homes.esm'
+      - 'Skyrim Project Optimization - Dawnguard.esm'
+  - name: 'Skyrim Project Optimization - Full Version.esm'
+    group: 'New Lands & Optimisers'
+  - name: 'Skyrim Project Optimization - No Homes - Full Version.esm'
+    group: 'New Lands & Optimisers'
+  - name: 'Riftrun_HF_v_2_0.esp'
+    after:
+      - 'Hideout_Main.esp'
+      - 'Hideout_HF_Main.esp'
+      - 'Hideout_DLC_Main.esp'
+      - 'Hideout_Compact.esp'
+      - 'Hideout_HF_Compact.esp'
+  - name: 'Dovahkiin_Retreat.esp'
+    after:
+      - 'Hideout_HF_Main.esp'
+      - 'Hideout_Main.esp'
+  - name: 'SmithBornMaterials.esm'
+    after:
+      - 'SmithBornPerks.esm'
+  - name: 'VanillaReducedTextures.esp'
+    group: 'New Lands & Optimisers'
+    after:
+      - 'Cutting Room Floor.esp'
+  - name: 'VanillaReducedTexturesDG.esp'
+    group: 'New Lands & Optimisers'
+    after:
+      - 'Cutting Room Floor.esp'
+      - 'VanillaReducedTextures.esp'
+  - name: 'VanillaReducedTexturesDB.esp'
+    group: 'New Lands & Optimisers'
+    after:
+      - 'Cutting Room Floor.esp'
+      - 'VanillaReducedTextures.esp'
+      - 'VanillaReducedTexturesDG.esp'
+  - name: 'Bethesda_Hi-Res_Optimized.esp'
+    group: 'New Lands & Optimisers'
+    after:
+      - 'HighResTexturePack01.esp'
+      - 'HighResTexturePack02.esp'
+      - 'HighResTexturePack03.esp'
+  - name: 'Skyrim Project Optimization - Full Version.esp'
+    group: 'New Lands & Optimisers'
+  - name: 'Skyrim Project Optimization - No Homes.esp'
+    group: 'New Lands & Optimisers'
+  - name: 'Skyrim Project Optimization - No Homes - Full Version.esp'
+    group: 'New Lands & Optimisers'
+  - name: 'Weapons & Armor Fixes_Remade.esp'
+    group: 'Underrides'
+    after:
+      - 'Guard Dialogue Overhaul.esp'
+  - name: 'Clothing & Clutter Fixes.esp'
+    group: 'Underrides'
+    after:
+      - 'Weapons & Armor Fixes_Remade.esp'
+  - name: 'PaperMapHeight-RemoveFog.esp'
+    after:
+      - 'WATER.esp'
+  - name: 'realrainextended.esp'
+    after:
+      - 'Purewaters.esp'
+  - name: 'TouringCarriages.esp'
+    group: 'New Lands & Optimisers'
+  - name: 'Cutting Room Floor.esp'
+    group: 'New Lands & Optimisers'
+    after:
+      - 'TouringCarriages.esp'
+      - 'WhiterunHoldForest.esp'
+  - name: 'TradeBarter.esp'
+    after:
+      - 'TradeRoutes.esp'
+  - name: 'Ish''s Respec Mod.esp'
+    after:
+      - 'Perky.esp'
+  - name: 'Scarcity - Less Loot Mod.esp'
+    group: 'Dynamic Patches'
+  - name: 'UnlimitedBookshelves.esp'
+    group: 'Underrides'
+  - name: 'skyBirds - Airborne Perching Birds.esp'
+    after:
+      - 'Birds.esp'
+      - 'BirdsHF.esp'
+      - 'Birdsclean.esp'
+      - 'BirdsHFclean.esp'
+      - 'Birdsofskyrim.esp'
+  - name: 'Smithing Coinage.esp'
+    after:
+      - 'Invent.esp'
+  - name: 'j3x-autocrossbows.esp'
+    after:
+      - 'dwarvenrifle.esp'
+      - 'dwarvenrifle_CN.esp'
+  - name: 'Immersive Weapons.esp'
+    after:
+      - 'AmazingFollowerTweaks.esp'
+  - name: 'sunnydawnbreaker.esp'
+    after:
+      - 'improvedrealistic.esp'
+  - name: 'Complete Crafting Overhaul_Remade.esp'
+    after:
+      - 'Weapons & Armor Fixes_Remade.esp'
+      - 'Clothing & Clutter Fixes.esp'
+      - 'aMidianBorn_ContentAddon.esp'
+  - name: 'CCO_SIC_Patch.esp'
+    after:
+      - 'Skyrim Immersive Creatures.esp'
+      - 'Skyrim Immersive Creatures - DLC2.esp'
+      - 'Complete Crafting Overhaul_Remade.esp'
+  - name: 'Requiem.esp'
+    group: 'Requiem'
+  - name: 'Requiem - Cutting Room Floor.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Audio Overhaul for Skyrim.esp'
+    after:
+      - 'Requiem - Cutting Room Floor.esp'
+  - name: 'Requiem - Immersive Sounds Compendium.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - 'Requiem - Cutting Room Floor.esp'
+  - name: 'Requiem - Immersive Horses.esp'
+    after:
+      - 'Requiem - Minor Arcana - Roleplaying.esp'
+      - 'Requiem - SkyTEST.esp'
+      - 'Requiem - Wild World.esp'
+  - name: 'Requiem - Craftable Horse Barding.esp'
+    after:
+      - 'Requiem - Immersive Horses.esp'
+      - 'Requiem - Minor Arcana - Roleplaying.esp'
+  - name: 'Requiem - SkyTEST.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Wild World.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Timing Is Everything.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Improved Closefaced Helmets.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - ESF Companions.esp'
+    after:
+      - 'Requiem - Minor Arcana - Roleplaying.esp'
+  - name: 'Requiem - Unique Uniques - AOS.esp'
+    after:
+      - 'Requiem - Audio Overhaul for Skyrim.esp'
+  - name: 'Requiem - Rustic Soulgems - ISC.esp'
+    after:
+      - 'Requiem - Immersive Sounds Compendium.esp'
+  - name: 'Requiem - Royal Armory.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - 'Requiem - Minor Arcana - Vigilants of Stendarr.esp'
+      - 'Requiem - Warmonger Armory.esp'
+  - name: 'Requiem - Scoped Bows.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - ArteFakes.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - 'Requiem - Cutting Room Floor.esp'
+      - 'Requiem - ESF Companions.esp'
+  - name: 'Requiem - Rough Leather Armor.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Book Covers Skyrim.esp'
+    after:
+      - 'Requiem - Minor Arcana - Roleplaying.esp'
+  - name: 'Requiem - Warmonger Armory.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - 'Requiem - Minor Arcana - Vigilants of Stendarr.esp'
+      - 'Requiem - Scale Nord Armor.esp'
+  - name: 'Requiem - Heavy Armory.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - WM Flora Fixes.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'AZ Tweaks.esp'
+    after:
+      - 'Requiem_Minor_Arcana.esp'
+  - name: 'Requiem - Breaking Bad.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - 'Requiem_Minor_Arcana.esp'
+  - name: 'XPMSE.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'RealisticRoomRental(-Basic)?.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Unlimited Training.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'WerewolfPerksExpanded.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Religion.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Realistic AI Detection 2.*\.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Requiem - Realistic Darkness.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Clairvoyance.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Tropical Skyrim.esp'
+    after:
+      - 'Better Mills Textures.esp'
+  - name: 'DeadlyDiversifiedDragonsPatch.esp'
+    after:
+      - 'DeadlyDragons.esp'
+      - 'DeadlyDragonsNormal.esp'
+      - 'DeadlyDragonsHard.esp'
+      - 'DeadlyDragonsHardcore.esp'
+      - 'DeadlyDragons DV.esp'
+      - 'DeadlyDragonsNormal DV.esp'
+      - 'DeadlyDragonsHard DV.esp'
+      - 'DeadlyDragonsHardcore DV.esp'
+  - name: 'DeadlyDragons(Hard|Normal|Hardcore)?( DV)?\.esp'
+    after:
+      - name: 'DragonsDiversified.esp'
+        condition: 'file("DeadlyDiversifiedDragonsPatch.esp")'
+      - 'PerkusMaximus_Master.esp'
+  - name: 'Scoped Bows - SkyRe Patch.esp'
+    after:
+      - 'SkyRe_Main.esp'
+      - 'SkyRe_Main_NoDawnguard.esp'
+      - 'SkyRe_Combat.esp'
+  - name: 'BetterBreezehome.esp'
+    after:
+      - 'FalkreathCastle.esp'
+  - name: 'CollegeOfWinterholdImmersive.esp'
+    after:
+      - 'Clothing & Clutter Fixes.esp'
+  - name: 'CWIDragonbornPatch.esp'
+    after:
+      - 'CollegeOfWinterholdImmersive.esp'
+  - name: 'CWIDawnguardPatch.esp'
+    after:
+      - 'CollegeOfWinterholdImmersive.esp'
+  - name: 'ElysiumEstate.esp'
+    after:
+      - 'WhiterunHoldForest.esp'
+  - name: 'Civil War Overhaul.esp'
+    after:
+      - 'OBIS.esp'
+      - 'OBISDB.esp'
+  - name: 'When Vampires Attack.esp'
+    after:
+      - 'Vampirelordroyal.esp'
+  - name: 'Thunderchild - Epic Shout Package.esp'
+    after:
+      - 'SPERG.esp'
+  - name: 'ub_cell_armory.esp'
+    after:
+      - 'ub_bbls_merge.esp'
+      - 'ub_bbls_merge_classier.esp'
+  - name: 'ub_cell_bedroom.esp'
+    after:
+      - 'ub_bbls_merge.esp'
+      - 'ub_bbls_merge_classier.esp'
+  - name: 'ub_cell_cavern.esp'
+    after:
+      - 'ub_bbls_merge.esp'
+      - 'ub_bbls_merge_classier.esp'
+  - name: 'ub_cell_darkarea.esp'
+    after:
+      - 'ub_bbls_merge.esp'
+      - 'ub_bbls_merge_classier.esp'
+  - name: 'ub_cell_dislayroom.esp'
+    after:
+      - 'ub_bbls_merge.esp'
+      - 'ub_bbls_merge_classier.esp'
+  - name: 'ub_cell_kitchen.esp'
+    after:
+      - 'ub_bbls_merge.esp'
+      - 'ub_bbls_merge_classier.esp'
+  - name: 'ub_cell_maintenance_room.esp'
+    after:
+      - 'ub_bbls_merge.esp'
+      - 'ub_bbls_merge_classier.esp'
+  - name: 'ub_cell_teleportroom.esp'
+    after:
+      - 'ub_bbls_merge.esp'
+      - 'ub_bbls_merge_classier.esp'
+  - name: 'ub_disable_teleportroom.esp'
+    after:
+      - 'ub_bbls_merge.esp'
+      - 'ub_bbls_merge_classier.esp'
+  - name: 'AtrociousRiftenTextureFix.esp'
+    after:
+      - 'Unique Grasses_clippingfixer.esp'
+  - name: 'whiterunMarket.esp'
+    after:
+      - 'forested_skyrim.esp'
+  - name: 'aMidianBorn_ContentAddon.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'DawnguardArmorLaup26.esp'
+    after:
+      - 'LorebalanceArtifacts.esp'
+  - name: 'ESFCompanions.esp'
+    after:
+      - 'Brevi_MoonlightTales.esp'
+      - 'BetterQuestObjectives.esp'
+  - name: 'ESFCompanions - VilkasProvingHonorNoShowFix.esp'
+    after:
+      - 'Brevi_MoonlightTales.esp'
+  - name: 'Guard Dialogue Overhaul.esp'
+    group: 'Underrides'
+    after:
+      - 'Hothtrooper44_ArmorCompilation.esp'
+      - 'Hothtrooper44_Armor_Ecksstra.esp'
+  - name: 'improvedrealistic.esp'
+    after:
+      - 'LMBalancingDawnguardDV.esp'
+  - name: 'RSChildren_PatchUSKP.esp'
+    after:
+      - 'RSChildren_V.esp'
+      - 'RSChildren_HF.esp'
+      - 'RSChildren_DB.esp'
+      - 'RSChildren - Complete.esp'
+  - name: 'Skyrim Horses Renewal.esp'
+    after:
+      - 'Convenient Horses.esp'
+  - name: 'TheChoiceIsYours.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'TimingIsEverything.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'Weapons & Armor_TrueOrcish&DaedricWeapons.esp'
+    after:
+      - 'Weapons & Armor Fixes_Remade.esp'
+  - name: 'NerniesSolitudeExpansion.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'NerniesCityandVillageExpansion.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'Open Cities Skyrim.esp'
+    group: 'Open Cities Skyrim'
+  - name: 'EnhancedLightsandFX.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+      - 'Better Mills Textures.esp'
+  - name: 'EnhancedLightsandFX_CN.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+  - name: 'ELFX - Exteriors.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+  - name: 'ELFXEnhancer.esp'
+    group: 'Lighting'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'ELFX - Hardcore.esp'
+    group: 'Lighting'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'ELFX - Moonpath.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+  - name: 'ELFX - NoBreezehome.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+  - name: 'ELFX - NoTaverns.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+  - name: 'ELFX - Dawnguard.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+  - name: 'ELFX - Dragonborn.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+  - name: 'Realistic Lighting Overhaul - Dawnguard Interiors.esp'
+    after:
+      - 'Realistic Lighting Overhaul - Dungeons.esp'
+  - name: 'RLO - Adaptive Interiors Vanilla Weathers Patch.esp'
+    after:
+      - 'Realistic Lighting Overhaul - Dungeons.esp'
+      - 'Realistic Lighting Overhaul - Brighter Dungeons.esp'
+      - 'Realistic Lighting Overhaul - Minor Cities and Towns Interiors.esp'
+      - 'Realistic Lighting Overhaul - Major City Interiors.esp'
+      - 'Realistic Lighting Overhaul - Weathers.esp'
+      - 'Realistic Lighting Overhaul - Weathers - Brighter Nights.esp'
+  - name: 'RLO - Major City Exteriors - No Guard Torches.esp'
+    after:
+      - 'Realistic Lighting Overhaul - Major City Exteriors.esp'
+  - name: 'ClimatesOfTamriel - VannillaNights.esp'
+    after:
+      - 'Realistic Lighting Overhaul - Major City Exteriors.esp'
+  - name: 'ELE_.+_Lite\.esp'
+    group: 'Lighting'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'RelightingSkyrim_Legendary.esp'
+      - 'RelightingSkyrim_S_DG_DB.esp'
+      - 'RelightingSkyrim.esp'
+      - 'RelightingSkyrim_DG.esp'
+      - 'RelightingSkyrim_HF.esp'
+      - 'RelightingSkyrim_DB.esp'
+  - name: 'ELE_Legendary_Lite.esp'
+    group: 'Lighting'
+    after:
+      - 'Alternate Start - Live Another Life.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'RelightingSkyrim_Legendary.esp'
+      - 'RelightingSkyrim.esp'
+  - name: 'SoS - The Dungeons-PatchELFX.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+  - name: 'SoS - Civilization-PatchELFX.esp'
+    after:
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+  - name: 'RND_Overhaul.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_CheckNeedsTranslation.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_BabettesFeasts.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_Cliffracers-Patch.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_HighlandMilkFarm-Patch.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'Hunterborn_RND-Patch.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_NerniesRangerPack-Patch.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'PrivateNeeds-RND.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_SkyMoMod-Patch.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'SI_RNADPatch.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'Disease Descriptions_RND Compatibile.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'KnapsackEnhanced.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'FalskaarRNDHotfix.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'NerniesCityandVillage_TRO_BasicNeeds_Patch.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'VLW_Hybrid.esp'
+    after:
+      - 'Better Vampires ML - No DawnGuard.esp'
+      - 'Better Vampires - No DawnGuard.esp'
+      - 'Better Vampires ML.esp'
+      - 'Better Vampires.esp'
+      - 'Better Vampires DG.esp'
+      - 'Brevi_MoonlightTales.esp'
+      - 'WerewolfMastery.esp'
+  - name: 'EnchantingAwakened.esp'
+    after:
+      - 'Chesko_Frostfall.esp'
+      - 'Apocalypse - The Spell Package.esp'
+      - 'Traps Are Dangerous.esp'
+      - 'Dwemer Certified.esp'
+      - 'More Exp Chance.esp'
+      - 'Requiem.esp'
+      - name: 'Animated Weapon Enchants.esp'
+        condition: 'file("EnchantingAwakenedAWEPatch.esp")'
+      - name: 'SeeEnchs.esp'
+        condition: 'file("EnchantingAwakenedSeeEnchPatch.esp")'
+  - name: 'Aurora - The Doomstone Package.esp'
+    after:
+      - 'EnchantingAwakened.esp'
+  - name: 'DeadlySpellImpacts.esp'
+    after:
+      - 'balanceddestructionv4.esp'
+  - name: 'DeadlySpellImpacts - Two Fire.esp'
+    after:
+      - 'DeadlySpellImpacts.esp'
+  - name: 'The Dance of Death V.+\.esp'
+    after:
+      - 'DragonCombatOverhaul.esp'
+      - 'DragonCombatOverhaulDragonborn.esp'
+      - 'DragonCombatOverhaulDragonborn - Requiem Patch.esp'
+      - 'Dragon Combat Overhaul.esp'
+  - name: 'The Dance of Death.esp'
+    after:
+      - 'DragonCombatOverhaul.esp'
+      - 'DragonCombatOverhaulDragonborn.esp'
+      - 'DragonCombatOverhaulDragonborn - Requiem Patch.esp'
+      - 'Dragon Combat Overhaul.esp'
+  - name: 'The Dance of Death - Dawnguard Edition.esp'
+    after:
+      - 'DragonCombatOverhaul.esp'
+      - 'DragonCombatOverhaulDragonborn.esp'
+      - 'DragonCombatOverhaulDragonborn - Requiem Patch.esp'
+      - 'Dragon Combat Overhaul.esp'
+  - name: 'The Dance of Death - Ultimate Edition.esp'
+    after:
+      - 'DragonCombatOverhaul.esp'
+      - 'DragonCombatOverhaulDragonborn.esp'
+      - 'DragonCombatOverhaulDragonborn - Requiem Patch.esp'
+      - 'Dragon Combat Overhaul.esp'
+  - name: 'VioLens( - Requiem Patch)?\.esp'
+    after:
+      - 'DragonCombatOverhaul.esp'
+      - 'DragonCombatOverhaulDragonborn.esp'
+      - 'DragonCombatOverhaulDragonborn - Requiem Patch.esp'
+  - name: 'ACE Armor.esp'
+    after:
+      - 'Stealth Skills Rebalanced_COMPLETE.esp'
+      - 'Stealth Skills Rebalanced_SNEAK.esp'
+  - name: 'Stealth Skills Rebalanced_COMPLETE.esp'
+    after:
+      - 'EnchantingAwakened.esp'
+      - 'NARC.esp'
+  - name: 'Stealth Skills Rebalanced_SNEAK.esp'
+    after:
+      - 'EnchantingAwakened.esp'
+  - name: 'SPERG.esp'
+    after:
+      - 'EnchantingAwakened.esp'
+  - name: 'RND_FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'IMCN_FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'IMCN_CookingExpanded-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_RWL-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'IMCN_RWL_Reduced-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'IMCN_RWL_Realistic-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_RWS-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'IMCN_RWS-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_BabettesFeast-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'IMCN_BabettesFeast-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_NCVE-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'RND_DestructibleBottles-FAMP.esp'
+    after:
+      - '3DNPC.esp'
+  - name: 'Endgame NPC Overhaul.esp'
+    after:
+      - 'UFO - Ultimate Follower Overhaul.esp'
+      - 'UFO - Dragonborn AddOn.esp'
+      - 'UFO - Dawnguard AddOn.esp'
+      - 'UFO - Heartfire AddOn.esp'
+  - name: 'ENPCO Dawnguard.esp'
+    after:
+      - 'Endgame NPC Overhaul.esp'
+  - name: 'ENPCO Hearthfire.esp'
+    after:
+      - 'Endgame NPC Overhaul.esp'
+  - name: 'ENPCO Dragonborn.esp'
+    after:
+      - 'Endgame NPC Overhaul.esp'
+  - name: 'SBF [A-Z][^l].*\.esp'
+    after:
+      - 'SBF All In One + DLC.esp'
+      - 'SBF All In One Vanilla.esp'
+      - 'Bijin Housecarls.esp'
+      - 'Bijin Warmaidens.esp'
+      - 'Bijin Warmaidens CBBE One esp.esp'
+      - 'Bijin Warmaidens UNP One esp.esp'
+  - name: 'BW Iona.esp'
+    after:
+      - 'SBF All In One + DLC.esp'
+      - 'SBF All In One Vanilla.esp'
+      - 'Bijin Housecarls.esp'
+      - 'Bijin Warmaidens.esp'
+      - 'Bijin Warmaidens CBBE One esp.esp'
+      - 'Bijin Warmaidens UNP One esp.esp'
+  - name: 'BW Lydia.esp'
+    after:
+      - 'SBF All In One + DLC.esp'
+      - 'SBF All In One Vanilla.esp'
+      - 'Bijin Housecarls.esp'
+      - 'Bijin Warmaidens.esp'
+      - 'Bijin Warmaidens CBBE One esp.esp'
+      - 'Bijin Warmaidens UNP One esp.esp'
+      - 'Feminine Females.esp'
+  - name: 'BW Njada Stonearm.esp'
+    after:
+      - 'SBF All In One + DLC.esp'
+      - 'SBF All In One Vanilla.esp'
+      - 'Bijin Housecarls.esp'
+      - 'Bijin Warmaidens.esp'
+      - 'Bijin Warmaidens CBBE One esp.esp'
+      - 'Bijin Warmaidens UNP One esp.esp'
+  - name: 'BW Ria.esp'
+    after:
+      - 'SBF All In One + DLC.esp'
+      - 'SBF All In One Vanilla.esp'
+      - 'Bijin Housecarls.esp'
+      - 'Bijin Warmaidens.esp'
+      - 'Bijin Warmaidens CBBE One esp.esp'
+      - 'Bijin Warmaidens UNP One esp.esp'
+  - name: 'Change Follower Outfits Redux.esp'
+    after:
+      - 'Lively Followers.esp'
+      - 'Thieves Guild Followers and Spouses.esp'
+  - name: 'Alternate Start - Live Another Life.esp'
+    group: 'Alternate Start & Requiem'
+  - name: 'SNE2014(Bliss|Energy|Garland|Precipice|Psycho|SideLine|Temeraire)(NEO|PredatorN|PredatorT|VampThirst|Vanilla)\.esp'
+    after:
+      - 'RCRN Classic - Hybrid Shaders.esp'
+      - 'RCRN Legacy - Hybrid Shaders.esp'
+      - 'RCRN Pure - Hybrid Shaders.esp'
+      - 'rcrnShaders.esp'
+      - 'rcrnPlus.esp'
+      - 'RCRNvolumetric.esp'
+  - name: 'SkyFalls + SkyMills + DG + DB.esp'
+    after:
+      - 'Distant DetailHF.esp'
+  - name: 'RealisticWaterTwo.esp'
+    after:
+      - 'SkyFalls + SkyMills.esp'
+      - 'SkyFalls + SkyMills Dawnguard.esp'
+      - 'SkyFalls + SkyMills Dragonborn.esp'
+      - 'SkyFalls + SkyMills Falskaar.esp'
+      - 'SkyFalls + SkyMills Wyrmstooth.esp'
+      - 'SkyFalls + SkyMills + DG.esp'
+      - 'SkyFalls + SkyMills + DB.esp'
+      - 'SkyFalls + SkyMills + FS.esp'
+      - 'SkyFalls + SkyMills + WT.esp'
+      - 'SkyFalls + SkyMills + DG + DB.esp'
+      - 'SkyFalls + SkyMills + DG + FS.esp'
+      - 'SkyFalls + SkyMills + DG + WT.esp'
+      - 'SkyFalls + SkyMills + DB + FS.esp'
+      - 'SkyFalls + SkyMills + DB + WT.esp'
+      - 'SkyFalls + SkyMills + FS + WT.esp'
+      - 'SkyFalls + SkyMills + DG + DB + FS.esp'
+      - 'SkyFalls + SkyMills + DG + DB + WT.esp'
+      - 'SkyFalls + SkyMills + DG + FS + WT.esp'
+      - 'SkyFalls + SkyMills + DB + FS + WT.esp'
+      - 'SkyFalls + SkyMills + DG + DB + FS + WT.esp'
+      - 'SkyFalls Dragonborn Small waterfalls.esp'
+      - 'SkyFalls Falskaar Small waterfalls.esp'
+      - 'SkyFalls DB + FS Small Waterfalls.esp'
+      - 'FarmhouseChimneys.esp'
+      - 'SDO Full-LOD - Waterfall Effects.esp'
+      - 'BirdsHFclean.esp'
+      - 'Point The Way.esp'
+      - 'Book Covers Skyrim.esp'
+      - 'Ducks and Swans.esp'
+      - 'Helgen Reborn.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Requiem.esp'
+  - name: 'RealisticWaterTwo - Legendary.esp'
+    after:
+      - 'SkyFalls + SkyMills.esp'
+      - 'SkyFalls + SkyMills Dawnguard.esp'
+      - 'SkyFalls + SkyMills Dragonborn.esp'
+      - 'SkyFalls + SkyMills Falskaar.esp'
+      - 'SkyFalls + SkyMills Wyrmstooth.esp'
+      - 'SkyFalls + SkyMills + DG.esp'
+      - 'SkyFalls + SkyMills + DB.esp'
+      - 'SkyFalls + SkyMills + FS.esp'
+      - 'SkyFalls + SkyMills + WT.esp'
+      - 'SkyFalls + SkyMills + DG + DB.esp'
+      - 'SkyFalls + SkyMills + DG + FS.esp'
+      - 'SkyFalls + SkyMills + DG + WT.esp'
+      - 'SkyFalls + SkyMills + DB + FS.esp'
+      - 'SkyFalls + SkyMills + DB + WT.esp'
+      - 'SkyFalls + SkyMills + FS + WT.esp'
+      - 'SkyFalls + SkyMills + DG + DB + FS.esp'
+      - 'SkyFalls + SkyMills + DG + DB + WT.esp'
+      - 'SkyFalls + SkyMills + DG + FS + WT.esp'
+      - 'SkyFalls + SkyMills + DB + FS + WT.esp'
+      - 'SkyFalls + SkyMills + DG + DB + FS + WT.esp'
+      - 'SkyFalls Dragonborn Small waterfalls.esp'
+      - 'SkyFalls Falskaar Small waterfalls.esp'
+      - 'SkyFalls DB + FS Small Waterfalls.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'Better Mills Textures.esp'
+    after:
+      - 'SkyFalls + SkyMills.esp'
+      - 'SkyFalls + SkyMills Dawnguard.esp'
+      - 'SkyFalls + SkyMills Dragonborn.esp'
+      - 'SkyFalls + SkyMills Falskaar.esp'
+      - 'SkyFalls + SkyMills Wyrmstooth.esp'
+      - 'SkyFalls + SkyMills + DG.esp'
+      - 'SkyFalls + SkyMills + DB.esp'
+      - 'SkyFalls + SkyMills + FS.esp'
+      - 'SkyFalls + SkyMills + WT.esp'
+      - 'SkyFalls + SkyMills + DG + DB.esp'
+      - 'SkyFalls + SkyMills + DG + FS.esp'
+      - 'SkyFalls + SkyMills + DG + WT.esp'
+      - 'SkyFalls + SkyMills + DB + FS.esp'
+      - 'SkyFalls + SkyMills + DB + WT.esp'
+      - 'SkyFalls + SkyMills + FS + WT.esp'
+      - 'SkyFalls + SkyMills + DG + DB + FS.esp'
+      - 'SkyFalls + SkyMills + DG + DB + WT.esp'
+      - 'SkyFalls + SkyMills + DG + FS + WT.esp'
+      - 'SkyFalls + SkyMills + DB + FS + WT.esp'
+      - 'SkyFalls + SkyMills + DG + DB + FS + WT.esp'
+      - 'SkyFalls Dragonborn Small waterfalls.esp'
+      - 'SkyFalls Falskaar Small waterfalls.esp'
+      - 'SkyFalls DB + FS Small Waterfalls.esp'
+      - 'Better Dynamic Snow.esp'
+      - 'StaticMeshImprovementMod.esp'
+  - name: 'Better Mills Tetxures - ELFX.esp'
+    after:
+      - 'EnhancedLightsandFX.esp'
+      - 'ELFX - Exteriors.esp'
+      - 'ELFX - Moonpath.esp'
+      - 'ELFX - NoBreezehome.esp'
+      - 'ELFX - NoTaverns.esp'
+      - 'ELFX - Dawnguard.esp'
+      - 'ELFX - Dragonborn.esp'
+  - name: 'Tamriel Reloaded.esp'
+    after:
+      - 'Better Mills Textures.esp'
+  - name: 'Better Mills Textures - Tamriel Reloaded.esp'
+    after:
+      - 'Tamriel Reloaded.esp'
+  - name: 'Better Mills Textures - Tropical Skyrim.esp'
+    after:
+      - 'Tropical Skyrim.esp'
+  - name: 'World_Map_Height_Pitch_Tweak(_(130|170|200|250|Vanilla_pitch))?(_50|_90)?\.esp'
+    group: 'Alternate Start & Requiem'
+  - name: 'TES5Merged.esp'
+    group: 'Dynamic Patches'
+  - name: 'Smashed Patch.esp'
+    group: 'Dynamic Patches'
+    after:
+      - 'TES5Merged.esp'
+  - name: 'Bashed Patch.*\.esp'
+    group: 'Dynamic Patches'
+    after:
+      - 'Scarcity - Less Loot Mod.esp'
+      - 'TES5Merged.esp'
+  - name: 'Automated Leveled List Addition.esp'
+    group: 'Dynamic Patches'
+  - name: 'Duke Patricks - Heavy Weapons Combat.esp'
+    group: 'Map Markers'
+  - name: 'Pre Automatic Variants.*\.esp'
+    group: 'ASIS'
+  - name: 'ASIS-Dependency.esp'
+    group: 'ASIS'
+  - name: 'PreASISPatch.*\.esp'
+    group: 'ASIS'
+  - name: 'Pre ReProccer.*\.esp'
+    group: 'ASIS'
+  - name: 'Automatic Variants.esp'
+    group: 'Late Patches'
+  - name: 'ASIS.esp'
+    group: 'Late Patches'
+  - name: 'CR Compatibility Patch.esp'
+    group: 'Late Patches'
+  - name: 'Automatic Spells.esp'
+    group: 'Late Patches'
+  - name: 'Automatic Variations.esp'
+    group: 'Late Patches'
+  - name: 'Customized AI.esp'
+    group: 'Late Patches'
+  - name: 'DEOS - Patch.esp'
+    group: 'Late Patches'
+  - name: 'LLI.esp'
+    group: 'Late Patches'
+  - name: 'GELO_Patcher_Build.esp'
+    group: 'Late Patches'
+  - name: 'Dual Sheath Redux Patch.esp'
+    group: 'Late Patches'
+    after:
+      - 'GELO_Patcher_Build.esp'
+      - 'LLI.esp'
+      - 'PatchusMaximus.esp'
+  - name: 'EveryBody''s Different.esp'
+    group: 'Late Patches'
+  - name: 'NPC Enchant Fix.esp'
+    group: 'Late Patches'
+  - name: 'NPC ReWeHeighter.esp'
+    group: 'Late Patches'
+  - name: 'Pauldrons_Greaves_Patch.esp'
+    group: 'Late Patches'
+  - name: 'PotentialFollower+PotentialMarriage.esp'
+    group: 'Late Patches'
+  - name: 'PatchusMaximus.esp'
+    group: 'Late Patches'
+  - name: 'Perk Patch.esp'
+    group: 'Late Patches'
+  - name: 'RBS.esp'
+    group: 'Late Patches'
+  - name: 'ReProccer.esp'
+    group: 'Late Patches'
+  - name: 'Requiem for the Indifferent.esp'
+    group: 'Late Patches'
+  - name: 'ScrollProccer.esp'
+    group: 'Late Patches'
+  - name: 'The Staff Machine.esp'
+    group: 'Late Patches'
+  - name: 'TravellersOfSkyrim - Custom Travellers.esp'
+    group: 'Late Patches'
+  - name: 'ZF Primary Needs Patcher.esp'
+    group: 'Late Patches'
+  - name: 'RSPatch.esp'
+    group: 'Late Patches'
+  - name: 'Vivid Snow.esp'
+    group: 'Late Patches'
+  - name: 'Vivid Snow Physical.esp'
+    group: 'Late Patches'
+  - name: 'SUM.esp'
+    group: 'SkyProc Unified Manager'
+  - name: 'DeadlyCombat_ASIS_Patch.esp'
+    group: 'Reproccer Patches'
+  - name: 'PostASISPatch.esp'
+    group: 'Reproccer Patches'
+  - name: 'Post ?Re[pP]roccer.*\.esp'
+    group: 'Reproccer Patches'
+  - name: 'ANC EOS Recipe Patch.esp'
+    group: 'Reproccer Patches'
+  - name: 'BlackSacramentArmor ReProccer Patch.esp'
+    group: 'Reproccer Patches'
+  - name: 'BSA WIC LVA ReProccer Patch.esp'
+    group: 'Reproccer Patches'
+  - name: 'CBC EN LL ReProccer Patch.esp'
+    group: 'Reproccer Patches'
+  - name: 'kids_of_skyrim - skeleton AV patch.esp'
+    group: 'Reproccer Patches'
+  - name: 'ReProccerNONPLAYERfix.esp'
+    group: 'Reproccer Patches'
+  - name: 'ReProccer-SkyforgeShields.esp'
+    group: 'Reproccer Patches'
+  - name: 'SkyforgedWeapons ReProccer Patch.esp'
+    group: 'Reproccer Patches'
+  - name: 'ReProccerSRP Better Vampires Compat.esp'
+    group: 'Reproccer Patches'
+  - name: 'WIC ReProccer Patch.esp'
+    group: 'Reproccer Patches'
+  - name: 'Miscellaneous ReProccer Patch.esp'
+    group: 'Reproccer Patches'
+  - name: 'SkyRe Destruction Tree Tweak Patch.*\.esp'
+    group: 'Reproccer Patches'
+  - name: 'qotsafans.*\.esp'
+    group: 'Reproccer Patches'
+  - name: 'Post Reproccer Scoped Bows Patch.esp'
+    group: 'Post-Reproccer Patches'
+  - name: 'EzEWorldMap.esp'
+    group: 'Maps & LOD'
+  - name: 'EzEMapSolstheim.esp'
+    group: 'Maps & LOD'
+  - name: 'Skyrim Unbound.esp'
+    group: 'Alternate Start & Requiem'
+  - name: 'Silent khajiit night-eye.esp'
+    after:
+      - 'nighteyetoggle.esp'
+  - name: 'Acquisitive Soul Gems.esp'
+    after:
+      - 'SkyRe_Main.esp'
+      - 'Enchantments Upgraded.esp'
+  - name: 'PerMa Expansion 1 - Wintermyst.esp'
+    after:
+      - 'PerkusMaximus_Master.esp'
+  - name: 'PerkusMaximus_Mage.esp'
+    after:
+      - 'PerMa Expansion 1 - Wintermyst.esp'
+  - name: 'Wind Destruction.esp'
+    after:
+      - 'PerkusMaximus_Mage.esp'
+  - name: 'Pre PaMa WAFR Patch.esp'
+    group: 'Pre-Patchus Maximus Patches'
+  - name: 'Pre PaMa CCF Patch.esp'
+    group: 'Pre-Patchus Maximus Patches'
+  - name: 'Pre PaMa CCOR Patch.esp'
+    group: 'Pre-Patchus Maximus Patches'
+    after:
+      - 'PerkusMaximus_Warrior.esp'
+  - name: 'NPO Module - Crossbows.esp'
+    after:
+      - 'PerkusMaximus_Warrior.esp'
+  - name: 'Default Teammate Weapon Draw Distance.esp'
+    after:
+      - 'Convenient Horses.esp'
+  - name: 'Undeath.esp'
+    after:
+      - 'MoonAndStar_MAS.esp'
+  - name: 'Verdant - A Skyrim Grass Plugin.esp'
+    after:
+      - 'Skyrim Flora Overhaul.esp'
+  - name: 'Immersive detection of NPC.esp'
+    after:
+      - 'Combat Evolved.esp'
+  - name: 'Better Stealth AI for Followers.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'EBS -.*\.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'Thieves Guild Requirements.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'More Draconic Dragon Aspect - (Wings|Tail|Wings and Tail)\.esp'
+    after:
+      - 'More Draconic Dragon Aspect - Powered Edition.esp'
+  - name: 'More Draconic Dragon Aspect - Flying Mod Addon.esp'
+    after:
+      - 'More Draconic Dragon Aspect - Powered Edition.esp'
+      - 'More Draconic Dragon Aspect - Tail.esp'
+      - 'More Draconic Dragon Aspect - Wings.esp'
+      - 'More Draconic Dragon Aspect - Wings and Tail.esp'
+  - name: 'Ordinator - Perks of Skyrim.esp'
+    group: 'Ordinator'
+  - name: 'Darkend.esp'
+    after:
+      - 'AOS.esp'
+  - name: 'Complete Alchemy & Cooking Overhaul.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+      - 'Complete Crafting Overhaul_Remade.esp'
+      - 'disparity.esp'
+      - 'Radiant and Unique Potions Poisons and Booze.esp'
+  - name: 'Elisdriel.esp'
+    after:
+      - 'WhiterunHoldForest.esp'
+  - name: 'JK''s Rorikstead.esp'
+    after:
+      - 'WhiterunHoldForest.esp'
+  - name: 'JK''s Skyrim.esp'
+    after:
+      - 'WhiterunHoldForest.esp'
+  - name: 'Lokir''s House.esp'
+    after:
+      - 'WhiterunHoldForest.esp'
+  - name: 'Nakahara.esp'
+    after:
+      - 'WhiterunHoldForest.esp'
+  - name: 'Superior Rorikstead.esp'
+    after:
+      - 'WhiterunHoldForest.esp'
+  - name: 'nTr4nc3 - Whiterun Mansion.esp'
+    after:
+      - 'WhiterunHoldForest.esp'
+  - name: 'MLU.esp'
+    group: 'Morrowloot'
+  - name: 'DynDOLOD.esp'
+    group: 'Maps & LOD'
+  - name: 'Dynamic Dialogue Followers.esp'
+    after:
+      - 'EFFDialogue.esp'
+  - name: 'Immersive Citizens - AI Overhaul.esp'
+    group: 'Immersive Citizens'
+    after:
+      - 'BHTNF.esp'
+      - 'BHTNF_Eli.esp'
+      - 'Breezehome_Fully_Upgradable.esp'
+      - 'Breezehome_Fully_Upgradable_DG.esp'
+      - 'Breezehome_Fully_Upgradable_NoDLC.esp'
+      - 'Civil War Repairs.esp'
+      - 'EnhancedLightsandFX.esp'
+      - 'ESFCompanions.esp'
+      - 'Hidden Hideouts of Skyrim City Edition - Merged.esp'
+      - 'Hidden Hideouts of Skyrim City Edition - Merged - No Map Markers.esp'
+      - 'Hidden Hideouts of Skyrim City Edition - Merged - Deep Immersion.esp'
+      - '3DNPC.esp'
+      - 'RayeksEnd.esp'
+      - 'Requiem.esp'
+      - 'Routa.esp'
+      - 'Routa Non-Stormcloak.esp'
+      - 'SkyfallEstateBuildable.esp'
+      - 'Thane''s Breezehome.esp'
+      - 'Thornrock.esp'
+      - 'Whiterun Complete.esp'
+      - 'nTr4nc3 - Whiterun Mansion.esp'
+  - name: 'Provincial Courier Service.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'Relationship Dialogue Overhaul.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Inconsequential NPCs.esp'
+  - name: 'CFTO.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'NPC_Overhaul_V_(1|2|3)_\.esp'
+    after:
+      - 'Feminine Females.esp'
+  - name: 'MoonAndStar_MAS.esp'
+    after:
+      - 'AuroraVillage.esp'
+  - name: 'No Vendor or Loot Spells.esp'
+    group: 'Reproccer Patches'
+  - name: 'Skyrim Unlocked.esp'
+    group: 'Skyrim Unlocked'
+  - name: 'RDO - Immersive Horses Patch.esp'
+    after:
+      - 'Requiem - Immersive Horses.esp'
+      - 'RDO - Requiem Patch.esp'
+  - name: 'Quest Markers Restored.esp'
+    group: 'Underrides'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'Serana Dialogue Edit.esp'
+    after:
+      - name: 'Relationship Dialogue Overhaul.esp'
+        condition: 'version("Serana Dialogue Edit.esp", >=, "1.0")'
+  - name: 'No Snow Under The Roof - CRF Patch.esp'
+    after:
+      - 'CRF - Lighting Overhaul.esp'
+  - name: 'more idle markers.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'The Brotherhood of Old.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'SkyrimSewers.esp'
+  - name: 'Sacrosanct - Vampires of Skyrim.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Tools of Kagrenac.esp'
+    after:
+      - 'ZIA_Ancient Pack.esp'
+      - 'ZIA_Complete Pack.esp'
+      - 'ZKN.esp'
+  - name: 'AnnaBreezehome.esp'
+    after:
+      - 'ELFX - NoBreezehome.esp'
+  - name: 'Infinite Gold For Merchants.esp'
+    after:
+      - 'VendorSaleDelay-Gone.esp'
+  - name: 'AlternatePerspective.esp'
+    group: 'Alternate Start & Requiem'

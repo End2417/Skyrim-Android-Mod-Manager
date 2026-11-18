@@ -44,9 +44,21 @@ class ProfMod(val name: String, val version: String, val link: String)
 class Profile(val id: String, val name: String, val enabled: List<String>, val order: List<PluginEntry>, val mods: List<ProfMod>)
 class Trouble(val phase: String, val original: List<String>, val cands: List<String>, val good: List<String>, val testing: List<String>)
 
+/** A set of files in Data that no installed mod owns (a plugin with its archives, or the loose files of one folder). */
+class Unmanaged(val label: String, val files: List<String>, val size: Long, val plugin: Boolean)
+
+/** The files of an archive that were found in Data with the same size, ready to be recorded as an installed mod. */
+class AdoptPlan(val name: String, val files: List<String>, val sizes: Map<String, Long>, val total: Int)
+
 class ModManager(private val ctx: Context) {
     private val store = File(ctx.filesDir, "mods").apply { mkdirs() }
     private val backupRoot = File(ctx.filesDir, "backups").apply { mkdirs() }
+    private val reportDir = File(ctx.filesDir, "reports").apply { mkdirs() }
+
+    /** Reports of archives the SE to LE converter made, keyed by the converted file's uri; the install that reads that file keeps its report. */
+    val conversions = java.util.concurrent.ConcurrentHashMap<String, String>()
+    fun hasConversionReport(id: String) = File(reportDir, "$id.md").exists()
+    fun conversionReport(id: String): String? = File(reportDir, "$id.md").takeIf { it.exists() }?.readText()
     private val cr = ctx.contentResolver
     private val known = setOf("meshes", "textures", "scripts", "sound", "interface", "skse", "strings",
         "seq", "music", "video", "grass", "lodsettings", "shadersfx", "facegen", "source")
@@ -189,10 +201,52 @@ class ModManager(private val ctx: Context) {
     fun install(dataUri: Uri, zipUri: Uri): Mod {
         val names = try { entryNames(zipUri) } catch (t: Throwable) { throw friendly(t) }
         if (names.isEmpty()) error("Empty zip")
+        detectRoot(names)?.let { base -> // the mod sits inside one or more wrapper folders: that folder is the real Data folder
+            val skipped = names.count { stripBase(it, base).isEmpty() }
+            addNote("Used the archive folder \"${base.joinToString("/")}\" as the Data folder" + (if (skipped > 0) "; skipped $skipped other file(s) (readmes or other options)." else "."))
+            return extract(dataUri, zipUri, zipName(zipUri)) { n -> stripBase(n, base) }
+        }
         val hasData = names.any { n -> segs(n).let { s -> s.indexOfFirst { it.equals("data", true) }.let { it in 0..1 && it < s.size - 1 } } }
         val firsts = names.map { segs(it).firstOrNull()?.lowercase() }.toSet()
         val wrap = !hasData && firsts.size == 1 && names.all { segs(it).size > 1 } && firsts.first() !in known
         return extract(dataUri, zipUri, zipName(zipUri)) { n -> mapPath(n, hasData, wrap)?.let { listOf(it) } ?: emptyList() }
+    }
+
+    /**
+     * How many leading folders of an archive path to drop so that what is left starts at the Data folder: just past a folder named Data, at the
+     * first game folder (meshes, textures, scripts…), or at a plugin or BSA file. Null when the path shows no sign of where the content starts.
+     */
+    private fun contentDepth(s: List<String>): Int? {
+        for (i in s.indices) {
+            val last = i == s.size - 1
+            val low = s[i].lowercase()
+            if (!last && low == "data") return i + 1
+            if (!last && low in known) return i
+            if (last && low.substringAfterLast('.', "") in setOf("esp", "esm", "esl", "bsa")) return i
+        }
+        return null
+    }
+
+    /** The wrapper folders to strip (the most common place where content starts), or null when the content is already at the top of the archive. */
+    private fun detectRoot(names: List<String>): List<String>? {
+        val counts = HashMap<String, Int>(); val first = HashMap<String, List<String>>()
+        for (n in names) {
+            val s = segs(n)
+            val d = contentDepth(s) ?: continue
+            val key = s.take(d).joinToString("/").lowercase()
+            counts[key] = (counts[key] ?: 0) + 1
+            if (key !in first) first[key] = s.take(d)
+        }
+        val best = counts.entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key.length }).firstOrNull()?.key ?: return null
+        return if (best.isEmpty()) null else first[best]
+    }
+
+    private fun stripBase(raw: String, base: List<String>): List<List<String>> {
+        val s = segs(raw)
+        if (s.any { it == ".." } || s.size <= base.size) return emptyList()
+        for (i in base.indices) if (!s[i].equals(base[i], true)) return emptyList()
+        val rel = s.drop(base.size)
+        return if (rel.first().equals("fomod", true)) emptyList() else listOf(rel)
     }
 
     /** Installs the files a FOMOD wizard selected, honouring source -> destination mappings and priorities. */
@@ -242,6 +296,8 @@ class ModManager(private val ctx: Context) {
         val backups = mutableMapOf<String, String>()
         val sizes = mutableMapOf<String, Long>()
         var bytes = 0L
+        val tracked = HashSet<String>() // every file some installed mod already owns
+        for (o in list()) for (f in o.files) tracked += normPath(f)
         try {
             Progress.report("Installing $name", "Preparing…", null, force = true)
             openArchive(ctx, zipUri).use { arch ->
@@ -258,10 +314,12 @@ class ModManager(private val ctx: Context) {
                         val dir = idx.dir(parent, dirs) ?: error("Cannot create folder ${parent.joinToString("/")}")
                         val kids = idx.children(parent)!!
                         val fname = rel.last(); val relStr = rel.joinToString("/")
+                        var oldBak: String? = null; var oldLen = -1L
                         kids.remove(fname.lowercase())?.let { old ->
                             val b = "${n++}.bak"
+                            oldLen = old.length()
                             cr.openInputStream(old.uri)!!.use { i -> File(bdir, b).outputStream().use { i.copyTo(it, BUF) } }
-                            backups[relStr] = b
+                            backups[relStr] = b; oldBak = b
                             old.delete()
                         }
                         val out = newFile(dir, fname) ?: error("Cannot create $fname")
@@ -271,6 +329,11 @@ class ModManager(private val ctx: Context) {
                         val wrote = if (prev == null) { val c = cr.openOutputStream(out.uri)!!.use { z.copyTo(it, BUF) }; first = out; c }
                         else cr.openInputStream(prev.uri)!!.use { i -> cr.openOutputStream(out.uri)!!.use { i.copyTo(it, BUF) } }
                         bytes += wrote; sizes[relStr] = wrote
+                        val ob = oldBak
+                        if (ob != null && oldLen == wrote && normPath(relStr) !in tracked && !isVanilla(relStr) && sameContent(File(bdir, ob), out)) {
+                            // an identical file that no mod owns is a leftover of this very mod, so there is nothing to restore later
+                            File(bdir, ob).delete(); backups.remove(relStr)
+                        }
                     }
                     if (first != null) { done++; Progress.report("Installing $name", files.lastOrNull().orEmpty(), done.toFloat() / total) }
                     true
@@ -280,18 +343,22 @@ class ModManager(private val ctx: Context) {
         } catch (t: Throwable) {
             removeFiles(dataUri, Mod(id, name, files, dirs, backups, time = System.currentTimeMillis())); throw friendly(t)
         } finally { Stage.clear(ctx) }
-        return Mod(id, name, files, dirs, backups, true, bytes, System.currentTimeMillis(), fsizes = sizes).also { save(it); syncActiveProfile(dataUri) }
+        val conv = conversions.remove(zipUri.toString())
+        val made = Mod(id, name, files, dirs, backups, true, bytes, System.currentTimeMillis(),
+            note = if (conv != null) "Converted from Special Edition" else "", fsizes = sizes)
+        if (conv != null) runCatching { File(reportDir, "$id.md").writeText(conv) }
+        return made.also { save(it); syncActiveProfile(dataUri) }
     }
 
     /** Removes a mod: its files (except any a newer mod now owns), restores originals it overwrote, and takes its plugins out of the load order. */
-    fun uninstall(dataUri: Uri, mod: Mod) {
-        removeFiles(dataUri, mod)
+    fun uninstall(dataUri: Uri, mod: Mod, restore: Boolean = true) {
+        removeFiles(dataUri, mod, restore)
         syncPlugins(dataUri, mod, Sync.REMOVE)
         if (list().none { it.name.equals(mod.name, true) }) removeFromProfiles(mod.name)
         syncActiveProfile(dataUri)
     }
 
-    private fun removeFiles(dataUri: Uri, mod: Mod) {
+    private fun removeFiles(dataUri: Uri, mod: Mod, restore: Boolean = true) {
         var done = 0
         Progress.report("Uninstalling ${mod.name}", "Preparing…", null, force = true)
         val idx = Idx(dataRoot(dataUri))
@@ -321,7 +388,7 @@ class ModManager(private val ctx: Context) {
                 }
                 kids.remove(key)?.delete()
                 kids.remove("$key.disabled")?.delete()
-                mod.backups[f]?.let { b ->
+                if (restore) mod.backups[f]?.let { b ->
                     val out = newFile(dir, fname) ?: return@let
                     kids[key] = out
                     File(bdir, b).inputStream().use { i -> cr.openOutputStream(out.uri)!!.use { i.copyTo(it, BUF) } }
@@ -333,7 +400,175 @@ class ModManager(private val ctx: Context) {
             val p = segs(d)
             if (idx.children(p)?.isEmpty() == true) idx.removeDir(p)
         }
-        bdir.deleteRecursively(); File(store, "${mod.id}.json").delete()
+        bdir.deleteRecursively(); File(store, "${mod.id}.json").delete(); File(reportDir, "${mod.id}.md").delete()
+    }
+
+    // ---------------- files the app did not install ----------------
+
+    /** Files this mod overwrote that no other mod here owns: probably leftovers of an earlier install, but possibly original game files. */
+    fun leftoverBackups(m: Mod): List<String> {
+        val others = HashSet<String>()
+        for (o in list()) if (o.id != m.id) for (f in o.files) others += normPath(f)
+        return m.backups.keys.filter { normPath(it) !in others && !isVanilla(it) }.sorted()
+    }
+
+    /** Treats these overwritten files as part of the mod: their saved copies are dropped, so uninstalling deletes them instead of restoring them. */
+    fun claimLeftovers(m: Mod, paths: Collection<String>): Mod {
+        val cur = list().firstOrNull { it.id == m.id } ?: return m
+        val bdir = File(backupRoot, cur.id)
+        val keep = cur.backups.toMutableMap()
+        for (p in paths) keep.remove(p)?.let { File(bdir, it).delete() }
+        return cur.copy(backups = keep).also { save(it) }
+    }
+
+    private fun isVanilla(rel: String): Boolean {
+        val s = segs(rel)
+        if (s.size != 1) return false
+        val n = s[0].lowercase()
+        return n in VANILLA_ROOT || (n.startsWith("skyrim - ") && n.endsWith(".bsa"))
+    }
+
+    private fun sameContent(a: File, b: DocumentFile): Boolean = try {
+        a.inputStream().use { x -> cr.openInputStream(b.uri)!!.use { y -> streamsEqual(x, y) } }
+    } catch (t: Throwable) { false }
+
+    private fun streamsEqual(x: InputStream, y: InputStream): Boolean {
+        val ba = ByteArray(BUF); val bb = ByteArray(BUF)
+        while (true) {
+            val n = x.fillBuf(ba); val m = y.fillBuf(bb)
+            if (n != m) return false
+            if (n == 0) return true
+            for (i in 0 until n) if (ba[i] != bb[i]) return false
+        }
+    }
+
+    /** Lists every file in Data that no installed mod owns and that is not a known game file, grouped by plugin (with its archives) or folder. */
+    fun scanUnmanaged(dataUri: Uri): List<Unmanaged> {
+        val idx = Idx(dataRoot(dataUri))
+        val owned = HashSet<String>()
+        for (m in list()) for (f in m.files) owned += normPath(f)
+        val found = mutableListOf<Pair<String, Long>>()
+        fun walk(p: List<String>) {
+            val kids = idx.children(p) ?: return
+            for (f in kids.values.toList()) {
+                val n = f.name ?: continue
+                val rel = p + n
+                if (f.isDirectory) {
+                    if (p.isEmpty() && (n.equals("video", true) || n.equals("SkyrimMM Backups", true))) continue
+                    walk(rel)
+                } else {
+                    val path = rel.joinToString("/")
+                    if (normPath(path).removeSuffix(".disabled") in owned || isVanilla(path)) continue
+                    found.add(path to f.length())
+                }
+            }
+        }
+        walk(emptyList())
+        fun ext(p: String) = p.substringAfterLast('.', "").lowercase()
+        val root = found.filter { '/' !in it.first }
+        val plugins = root.filter { ext(it.first) in setOf("esp", "esm", "esl") }.sortedBy { it.first.lowercase() }
+        val bsas = root.filter { ext(it.first) == "bsa" }
+        val used = HashSet<String>()
+        val out = mutableListOf<Unmanaged>()
+        for (pl in plugins) {
+            val base = pl.first.substringBeforeLast('.').lowercase()
+            val mine = bsas.filter { b -> b.first !in used && b.first.lowercase().let { it == "$base.bsa" || (it.startsWith("$base - ") && it.endsWith(".bsa")) } }
+            used.add(pl.first); mine.forEach { used.add(it.first) }
+            val all = listOf(pl) + mine
+            out.add(Unmanaged("Plugin: ${pl.first}" + (if (mine.isNotEmpty()) " + ${mine.size} archive(s)" else ""), all.map { it.first }, all.sumOf { it.second }, true))
+        }
+        val loose = found.filter { it.first !in used }.groupBy { e ->
+            val d = e.first.split('/').dropLast(1)
+            if (d.isEmpty()) "Data folder (top level)" else d.take(3).joinToString("/")
+        }
+        for ((k, v) in loose.entries.sortedByDescending { e -> e.value.sumOf { it.second } })
+            out.add(Unmanaged(k, v.map { it.first }.sorted(), v.sumOf { it.second }, false))
+        return out
+    }
+
+    private fun moveTo(src: DocumentFile, srcDir: DocumentFile, dstDir: DocumentFile, name: String): Boolean {
+        if (src.uri.scheme == "file" && dstDir.uri.scheme == "file") {
+            if (File(src.uri.path!!).renameTo(File(dstDir.uri.path!!, name))) return true
+        } else {
+            val ok = try { DocumentsContract.moveDocument(cr, src.uri, srcDir.uri, dstDir.uri) != null } catch (t: Throwable) { false }
+            if (ok) return true
+        }
+        val out = newFile(dstDir, name) ?: return false
+        return try {
+            cr.openInputStream(src.uri)!!.use { i -> cr.openOutputStream(out.uri)!!.use { o -> i.copyTo(o, BUF) } }
+            src.delete()
+        } catch (t: Throwable) { out.delete(); false }
+    }
+
+    /** Moves files out of Data into SkyrimMM Backups/Removed/<time> (same folder layout) instead of deleting them. Returns how many moved. */
+    fun removeUnmanaged(dataUri: Uri, files: List<String>): Int {
+        val idx = Idx(dataRoot(dataUri))
+        val trash = Idx(rootOf(dataUri) ?: error("Invalid folder"))
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+        var moved = 0; var done = 0
+        val parents = HashSet<List<String>>()
+        Progress.report("Moving files out of Data", "Preparing…", null, force = true)
+        for (f in files) {
+            val s = segs(f)
+            Progress.report("Moving files out of Data", f, (++done).toFloat() / files.size)
+            if (s.isEmpty()) continue
+            val kids = idx.children(s.dropLast(1)) ?: continue
+            val srcDir = idx.dir(s.dropLast(1)) ?: continue
+            val src = kids[s.last().lowercase()] ?: continue
+            val dst = trash.dir(listOf("SkyrimMM Backups", "Removed", stamp) + s.dropLast(1), mutableListOf<String>()) ?: continue
+            if (moveTo(src, srcDir, dst, s.last())) { kids.remove(s.last().lowercase()); moved++; parents.add(s.dropLast(1)) }
+        }
+        for (p in parents.sortedByDescending { it.size }) {
+            var q = p
+            while (q.isNotEmpty() && idx.children(q)?.isEmpty() == true) { idx.removeDir(q); q = q.dropLast(1) }
+        }
+        val gone = files.filter { f -> segs(f).size == 1 && segs(f)[0].substringAfterLast('.', "").lowercase() in setOf("esp", "esm", "esl") }
+        if (gone.isNotEmpty()) syncPlugins(dataUri, Mod("unmanaged", "Unmanaged files", gone, emptyList(), emptyMap()), Sync.REMOVE)
+        syncActiveProfile(dataUri)
+        return moved
+    }
+
+    /**
+     * Looks through an archive for files that already sit in Data with the same path and size and that no mod owns. The archive may be laid out
+     * differently from how the mod was installed (a Data folder, a wrapper folder, FOMOD option folders), so leading folders are tried one by one.
+     */
+    fun adoptPreview(dataUri: Uri, zipUri: Uri): AdoptPlan {
+        val idx = Idx(dataRoot(dataUri))
+        val owned = HashSet<String>()
+        for (m in list()) for (f in m.files) owned += normPath(f)
+        Progress.report("Reading archive", "Matching files…", null, force = true)
+        val matched = LinkedHashMap<String, Pair<String, Long>>()
+        var total = 0
+        try {
+            openArchive(ctx, zipUri).use { arch ->
+                for ((entry, size) in arch.sizes()) {
+                    val s = segs(entry)
+                    if (s.isEmpty() || s.any { it == ".." } || s.any { it.equals("fomod", true) }) continue
+                    total++
+                    for (i in 0..minOf(4, s.size - 1)) {
+                        val rel = s.drop(i)
+                        val f = idx.children(rel.dropLast(1))?.get(rel.last().lowercase()) ?: continue
+                        if (!f.isFile || f.length() != size) continue
+                        val path = rel.joinToString("/")
+                        if (normPath(path) !in owned && normPath(path) !in matched) matched[normPath(path)] = path to size
+                        break
+                    }
+                }
+            }
+        } catch (t: Throwable) { throw friendly(t) } finally { Stage.clear(ctx) }
+        val files = matched.values.map { it.first }
+        return AdoptPlan(zipName(zipUri), files, matched.values.associate { it.first to it.second }, total)
+    }
+
+    /** Records the matched files as an installed mod. Nothing in Data changes; the app can now disable and uninstall it. */
+    fun adopt(dataUri: Uri, plan: AdoptPlan, name: String): Mod {
+        if (plan.files.isEmpty()) error("Nothing to adopt")
+        val dirs = LinkedHashSet<String>()
+        for (f in plan.files) { val s = segs(f); for (k in 1 until s.size) dirs.add(s.take(k).joinToString("/")) }
+        val id = UUID.randomUUID().toString().take(8)
+        val m = Mod(id, name.trim().ifBlank { plan.name }, plan.files, dirs.toList(), emptyMap(), true, plan.sizes.values.sum(), System.currentTimeMillis(), fsizes = plan.sizes)
+        save(m); syncActiveProfile(dataUri)
+        return m
     }
 
     /** True when the app has All files access, so shared-storage folders can be used as plain files (far faster than SAF). */
@@ -909,6 +1144,16 @@ private class Idx(val root: DocumentFile) {
         dirs.remove(key(p)); kids.remove(key(p))
         kids[key(p.dropLast(1))]?.remove(p.last().lowercase())
     }
+}
+
+/** Game files in the top of Data, which are never offered as "unmanaged" and never treated as leftovers. */
+private val VANILLA_ROOT = setOf("skyrim.esm", "update.esm", "dawnguard.esm", "hearthfires.esm", "dragonborn.esm",
+    "dawnguard.bsa", "hearthfires.bsa", "dragonborn.bsa", "update.bsa")
+
+private fun InputStream.fillBuf(b: ByteArray): Int {
+    var t = 0
+    while (t < b.size) { val r = read(b, t, b.size - t); if (r < 0) break; t += r }
+    return t
 }
 
 private val SKSE_TERMS = listOf("SKSE", "ModEvent", "StringUtil", "NetImmerse", "UICallback", "SKI_ConfigBase", "StorageUtil",

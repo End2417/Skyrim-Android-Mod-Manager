@@ -127,6 +127,11 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
     var updateOf by remember { mutableStateOf<Mod?>(null) }
     var conflictsOf by remember { mutableStateOf<Mod?>(null) }
     var askPlugins by remember { mutableStateOf<Mod?>(null) }
+    var askLeft by remember { mutableStateOf<Pair<Mod, List<String>>?>(null) }
+    var adoptPlan by remember { mutableStateOf<AdoptPlan?>(null) }
+    var convAsk by remember { mutableStateOf<Uri?>(null) }
+    var convDone by remember { mutableStateOf<ConvResult?>(null) }
+    var reportShown by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmOff by remember { mutableStateOf<Mod?>(null) }
     var showTools by remember { mutableStateOf(false) }
     var tool by remember { mutableStateOf<String?>(null) }
@@ -148,6 +153,7 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
             .let { l -> when (sort) { 1 -> l.sortedByDescending { it.time }; 2 -> l.sortedByDescending { it.size }; else -> l } }
     }
     val conflicts = remember(mods) { conflictMap(mods) }
+    val reportIds = remember(mods) { mods.filter { mgr.hasConversionReport(it.id) }.map { it.id }.toSet() }
     SideEffect { mgr.manualPlugins = pluginsUri }
     var fast by remember { mutableStateOf(mgr.fastAccess()) }
     DisposableEffect(Unit) {
@@ -188,6 +194,11 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
         port = dataUri?.let { u -> withContext(Dispatchers.IO) { runCatching { mgr.findPortDir(u) != null }.getOrDefault(false) } }
     }
 
+    /** After an install: offers to activate the mod's plugins, if it has any and a load order file can be found. */
+    fun offerPlugins(m: Mod) {
+        scope.launch { if (m.plugins.isNotEmpty() && withContext(Dispatchers.IO) { mgr.hasOrderFiles(dataUri) }) askPlugins = m }
+    }
+
     fun io(label: String = "Installed", block: () -> Mod) {
         val lbl = if (label == "Installed" && updateOf != null) "Updated" else label
         busy = true
@@ -202,7 +213,10 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
             }
             mods = mgr.list(); busy = false; prog = null; updateOf = null; tick++
             result?.let { m ->
-                if (lbl == "Installed" && m.plugins.isNotEmpty() && withContext(Dispatchers.IO) { mgr.hasOrderFiles(dataUri) }) askPlugins = m
+                if (lbl == "Installed") {
+                    val lo = withContext(Dispatchers.IO) { runCatching { mgr.leftoverBackups(m) }.getOrDefault(emptyList()) }
+                    if (lo.isNotEmpty()) { askLeft = m to lo } else { offerPlugins(m) }
+                }
             }
         }
     }
@@ -287,10 +301,30 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
         if (us.isEmpty()) updateOf = null
         else if (updateOf != null) pending.add(us.first()) else pending.addAll(us)
     }
+    /** Converts a Special Edition archive to Legendary Edition in the background, then shows what the conversion did. */
+    fun convertSe(u: Uri, cap: Int) {
+        busy = true; prog = Prog("Converting to Legendary Edition", "Preparing…", null)
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { Backport.convert(ctx, u, cap) } }
+            busy = false; prog = null
+            r.onSuccess { convDone = it }.onFailure { status = "Conversion failed: ${it.message}"; updateOf = null }
+        }
+    }
+    val pickAdopt = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u ->
+        val d = dataUri
+        if (u != null && d != null) {
+            busy = true; prog = Prog("Reading archive", "Matching files…", null)
+            scope.launch {
+                val r = withContext(Dispatchers.IO) { runCatching { mgr.adoptPreview(d, u) } }
+                busy = false; prog = null
+                r.onSuccess { adoptPlan = it }.onFailure { status = "Error: ${it.message}" }
+            }
+        }
+    }
     LaunchedEffect(incoming.size) { if (incoming.isNotEmpty()) { pending.addAll(incoming); incoming.clear() } }
     // Several archives queue up and install one after another, each waiting for any dialog before it.
-    LaunchedEffect(busy, wiz, skseZip, askPlugins, pending.size) {
-        if (!busy && wiz == null && skseZip == null && askPlugins == null && pending.isNotEmpty()) handle(pending.removeAt(0))
+    LaunchedEffect(busy, wiz, skseZip, askPlugins, askLeft, convAsk, convDone, pending.size) {
+        if (!busy && wiz == null && skseZip == null && askPlugins == null && askLeft == null && convAsk == null && convDone == null && pending.isNotEmpty()) handle(pending.removeAt(0))
     }
 
     skseZip?.let { (u, why, se) ->
@@ -311,7 +345,12 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                 }
             },
-            confirmButton = { TextButton(onClick = { skseZip = null; begin(u) }) { Text("Install anyway") } },
+            confirmButton = {
+                Row {
+                    if (se.isNotEmpty()) TextButton(onClick = { skseZip = null; convAsk = u }) { Text("Convert to LE") }
+                    TextButton(onClick = { skseZip = null; begin(u) }) { Text("Install anyway") }
+                }
+            },
             dismissButton = { TextButton(onClick = { skseZip = null; updateOf = null; mgr.clearStage(); status = "Install cancelled." }) { Text("Cancel") } })
     }
     wiz?.let { (w, pack, zip) ->
@@ -321,13 +360,18 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
     }
     confirm?.let { m ->
         var details by remember(m.id) { mutableStateOf(false) }
+        var noRestore by remember(m.id) { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { confirm = null },
             title = { Text("Uninstall ${m.name}?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("This removes ${m.files.size} files" + (if (m.size >= 0) " (${fmtSize(m.size)})" else "") + " the mod added" +
-                            if (m.backups.isNotEmpty()) " and restores ${m.backups.size} file(s) it overwrote." else ".")
+                            if (m.backups.isNotEmpty() && !noRestore) " and restores ${m.backups.size} file(s) it overwrote." else ".")
+                    if (m.backups.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { noRestore = !noRestore }) {
+                        Checkbox(noRestore, { noRestore = it })
+                        Text("Don't restore the overwritten files; remove them too (for leftovers of an earlier install)", style = MaterialTheme.typography.bodySmall)
+                    }
                     val cs = conflicts[m.id].orEmpty()
                     if (cs.isNotEmpty()) Text("Heads-up: ${cs.map { it.path }.distinct().size} of its files overlap with other mods (${cs.map { it.other.name }.distinct().joinToString()}). Files another mod wins stay in place; files this mod wins go back to the older version.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -347,14 +391,53 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { confirm = null; io("Uninstalled") { mgr.uninstall(dataUri!!, m); m } }) { Text("Uninstall") } },
+            confirmButton = { TextButton(onClick = { confirm = null; io("Uninstalled") { mgr.uninstall(dataUri!!, m, !noRestore); m } }) { Text("Uninstall") } },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel") } })
     }
+
+    askLeft?.let { (m, lo) ->
+        AlertDialog(
+            onDismissRequest = { askLeft = null; offerPlugins(m) },
+            title = { Text("Existing files were replaced") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${m.name} replaced ${lo.size} file(s) that no mod installed with this app owns. If they are leftovers of an earlier install of this mod " +
+                            "(for example from before the app was reinstalled), treat them as part of the mod so uninstalling removes them too. " +
+                            "If they are original game files or belong to another mod, keep them so uninstalling puts them back.")
+                    LazyColumn(Modifier.heightIn(max = 160.dp)) { items(lo) { Text(it, style = MaterialTheme.typography.bodySmall) } }
+                }
+            },
+            confirmButton = { TextButton(onClick = { askLeft = null; offerPlugins(m) }) { Text("Keep as originals") } },
+            dismissButton = {
+                TextButton(onClick = {
+                    askLeft = null
+                    scope.launch {
+                        val n = withContext(Dispatchers.IO) { mgr.claimLeftovers(m, lo) }
+                        mods = mgr.list(); offerPlugins(n)
+                    }
+                }) { Text("Treat as leftovers") }
+            })
+    }
+    adoptPlan?.let { p ->
+        AdoptDialog(p, onAdopt = { n -> adoptPlan = null; io("Adopted") { mgr.adopt(dataUri!!, p, n) } }, onClose = { adoptPlan = null })
+    }
+
+    convAsk?.let { u ->
+        ConvertOptionsDialog(prefs.getInt("seCap", 0),
+            onStart = { c -> prefs.edit().putInt("seCap", c).apply(); convAsk = null; convertSe(u, Backport.CAPS[c.coerceIn(0, Backport.CAPS.size - 1)]) },
+            onClose = { convAsk = null; updateOf = null; mgr.clearStage(); status = "Install cancelled." })
+    }
+    convDone?.let { res ->
+        ConvertDoneDialog(res,
+            onInstall = { convDone = null; mgr.conversions[res.file.toString()] = res.report; begin(res.file) },
+            onCancel = { convDone = null; updateOf = null; Backport.clear(ctx); status = "Install cancelled." })
+    }
+    reportShown?.let { (n, t) -> ReportDialog(n, t) { reportShown = null } }
 
     prog?.let { ProgressDialog(it) }
 
     if (showTools) ToolsDialog(
-        onPick = { if (it == "update") checkUpdates(true) else tool = it; showTools = false },
+        onPick = { if (it == "update") checkUpdates(true) else if (it == "adopt") pickAdopt.launch(ARCHIVE_TYPES) else tool = it; showTools = false },
         onClose = { showTools = false }, autoCheck = autoUpdate,
         onAutoCheck = { autoUpdate = it; prefs.edit().putBoolean("autoUpdate", it).apply() })
     update?.let { u ->
@@ -377,6 +460,7 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
         "verify" -> dataUri?.let { VerifyDialog(mgr, it, mods) { tool = null } }
         "profiles" -> dataUri?.let { ProfilesDialog(mgr, it, ctx, tick, run, { msg -> status = msg }) { tool = null } }
         "ini" -> IniDialog(mgr, dataUri, iniUri, { pickIni.launch(arrayOf("*/*")) }, run) { tool = null }
+        "unmanaged" -> dataUri?.let { UnmanagedDialog(mgr, it, run) { tool = null } }
         "trouble" -> dataUri?.let { TroubleshootDialog(mgr, it, tick, run) { tool = null } }
         else -> {}
     }
@@ -511,7 +595,8 @@ fun App(ctx: Context, incoming: MutableList<Uri>) {
                     else io(if (on) "Enabled" else "Disabled") { mgr.setEnabled(dataUri!!, m, on) }
                 },
                 onUninstall = { confirm = it }, onShowFiles = { filesOf = it },
-                onUpdate = { m -> updateOf = m; pickZip.launch(ARCHIVE_TYPES) }, onConflicts = { conflictsOf = it }, onEdit = { editOf = it }, profileName = activeProfile)
+                onUpdate = { m -> updateOf = m; pickZip.launch(ARCHIVE_TYPES) }, onConflicts = { conflictsOf = it }, onEdit = { editOf = it }, profileName = activeProfile,
+                reports = reportIds, onReport = { m -> scope.launch { val t = withContext(Dispatchers.IO) { mgr.conversionReport(m.id) }; if (t != null) reportShown = m.name to t } })
         }
     }
 }
@@ -608,7 +693,7 @@ fun CompactSearch(value: String, onChange: (String) -> Unit, modifier: Modifier 
 @Composable
 fun ModList(mods: List<Mod>, allCount: Int, query: String, onQuery: (String) -> Unit, sort: Int, onSort: (Int) -> Unit,
             actionsEnabled: Boolean, conflicts: Map<String, List<Conflict>>, onToggle: (Mod, Boolean) -> Unit,
-            onUninstall: (Mod) -> Unit, onShowFiles: (Mod) -> Unit, onUpdate: (Mod) -> Unit, onConflicts: (Mod) -> Unit, onEdit: (Mod) -> Unit, profileName: String? = null) {
+            onUninstall: (Mod) -> Unit, onShowFiles: (Mod) -> Unit, onUpdate: (Mod) -> Unit, onConflicts: (Mod) -> Unit, onEdit: (Mod) -> Unit, profileName: String? = null, reports: Set<String> = emptySet(), onReport: (Mod) -> Unit = {}) {
     if (allCount > 0) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CompactSearch(query, onQuery, Modifier.weight(1f))
@@ -667,6 +752,7 @@ fun ModList(mods: List<Mod>, allCount: Int, query: String, onQuery: (String) -> 
                             DropdownMenuItem(text = { Text("Edit details") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { menu = false; onEdit(m) })
                             DropdownMenuItem(text = { Text("Update") }, enabled = actionsEnabled, leadingIcon = { Icon(Icons.Default.Refresh, null) },
                                 onClick = { menu = false; onUpdate(m) })
+                            if (m.id in reports) DropdownMenuItem(text = { Text("Conversion report") }, onClick = { menu = false; onReport(m) })
                             DropdownMenuItem(text = { Text("Uninstall", color = MaterialTheme.colorScheme.error) }, enabled = actionsEnabled,
                                 leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onUninstall(m) })
                         }
@@ -736,6 +822,10 @@ fun LoadOrderScreen(mgr: ModManager, mods: List<Mod>, dataUri: Uri?, manual: Uri
     var confirmStamp by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    var sortRes by remember { mutableStateOf<LootSort.Result?>(null) }
+    var sortBusy by remember { mutableStateOf(false) }
+    var rulesTick by remember { mutableStateOf(0) }
     val ready = files.dir != null || files.plugins != null
     val issues = remember(scan, list.toList()) { checkMasters(list.toList(), scan) }
 
@@ -801,6 +891,40 @@ fun LoadOrderScreen(mgr: ModManager, mods: List<Mod>, dataUri: Uri?, manual: Uri
                 } else onStatus("Error: ${r.exceptionOrNull()?.message}")
             }
         }) { Icon(Icons.Default.Check, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Save") }
+    }
+    sortRes?.let { res ->
+        SortDialog(res, list.size, onApply = {
+            val by = list.associateBy { it.name.lowercase() }
+            val sorted = res.order.mapNotNull { by[it.lowercase()] }
+            if (sorted.size == list.size) {
+                list.clear(); list.addAll(sorted); dirty = true
+                onStatus("Sorted with the LOOT rules (${res.moved.size} moved). Review the list, then press Save.")
+            } else onStatus("The list changed while sorting. Press Sort again.")
+            sortRes = null
+        }, onClose = { sortRes = null })
+    }
+    if (ready) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(enabled = !sortBusy && list.isNotEmpty(), onClick = {
+                sortBusy = true
+                scope.launch {
+                    val r = withContext(Dispatchers.IO) { runCatching { lootSortPlan(ctx, list.toList(), scan) } }
+                    sortBusy = false
+                    r.onSuccess { sortRes = it }.onFailure { onStatus("Sort failed: ${it.message}") }
+                }
+            }) { Text(if (sortBusy) "Sorting…" else "Sort (LOOT rules)") }
+            TextButton(enabled = !sortBusy, onClick = {
+                sortBusy = true; onStatus("Downloading the newest LOOT masterlists…")
+                scope.launch {
+                    val r = withContext(Dispatchers.IO) { runCatching { LootRules.refresh(ctx) } }
+                    sortBusy = false; rulesTick++
+                    onStatus(r.getOrElse { "Could not update the rules: ${it.message}" })
+                }
+            }) { Text("Update rules") }
+        }
+        val rulesAt = remember(rulesTick) { LootRules.updatedAt(ctx) }
+        Text(if (rulesAt == null) "Rules: the LOOT masterlists bundled with the app" else "Rules: LOOT masterlists downloaded " + java.text.DateFormat.getDateInstance().format(java.util.Date(rulesAt)),
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
     }
     if (issues.isNotEmpty()) {
         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(

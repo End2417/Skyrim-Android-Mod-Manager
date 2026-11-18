@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,19 +34,26 @@ fun ToolsDialog(onPick: (String) -> Unit, onClose: () -> Unit, autoCheck: Boolea
         Triple("profiles", "Profiles and setups", "Save, switch, share or import mod and load order setups"),
         Triple("ini", "Skyrim.ini helper", "Turn on loose file loading"),
         Triple("trouble", "Troubleshoot crashes", "Find the mod causing a problem by switching mods off in steps"),
+        Triple("adopt", "Adopt an existing mod", "Pick a mod's archive so the app can track files already in Data"),
+        Triple("unmanaged", "Find unmanaged files", "List files in Data that no installed mod owns, and move them out"),
         Triple("update", "Check for updates", "See whether a newer version of the app is available"))
     AlertDialog(
         onDismissRequest = onClose, title = { Text("Tools") },
         text = {
-            Column {
+            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
                 items.forEach { (key, title, hint) ->
-                    ListItem(colors = ListItemDefaults.colors(containerColor = Color.Transparent), modifier = Modifier.clickable { onPick(key) },
-                        headlineContent = { Text(title) }, supportingContent = { Text(hint) })
+                    Column(Modifier.fillMaxWidth().clickable { onPick(key) }.padding(horizontal = 4.dp, vertical = 8.dp)) {
+                        Text(title, style = MaterialTheme.typography.bodyLarge)
+                        Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                    }
                 }
-                ListItem(colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    headlineContent = { Text("Check for updates when the app opens") },
-                    supportingContent = { Text("Looks up the latest release on GitHub") },
-                    trailingContent = { Switch(checked = autoCheck, onCheckedChange = onAutoCheck) })
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Check for updates when the app opens", style = MaterialTheme.typography.bodyLarge)
+                        Text("Looks up the latest release on GitHub", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                    }
+                    Switch(checked = autoCheck, onCheckedChange = onAutoCheck)
+                }
             }
         },
         confirmButton = { TextButton(onClick = onClose) { Text("Close") } })

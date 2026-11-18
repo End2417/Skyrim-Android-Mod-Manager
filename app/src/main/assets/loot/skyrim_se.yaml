@@ -1,0 +1,2612 @@
+# Reduced copy of the LOOT masterlist: only the groups and the group / load-after data of each plugin are kept.
+groups:
+  - name: 'Main Plugins'
+  - name: 'Creation Club'
+    after: [ 'Main Plugins' ]
+  - name: 'Unofficial Patches'
+    after: [ 'Creation Club' ]
+  - name: 'Script Fixes & Optimization'
+    after: [ 'Unofficial Patches' ]
+  - name: 'Fixes'
+    after: [ 'Script Fixes & Optimization' ]
+  - name: 'Resources & Frameworks'
+    after: [ 'Fixes' ]
+  - name: 'Early Loaders'
+    after: [ 'Resources & Frameworks' ]
+  - name: 'New Content'
+    after: [ 'Early Loaders' ]
+  - name: 'Underrides'
+    after: [ 'New Content' ]
+  - name: 'default'
+    after: [ 'Underrides' ]
+  - name: 'Low Priority Overrides'
+    after: [ 'default' ]
+  - name: 'Immersive Citizens'
+    after: [ 'Low Priority Overrides' ]
+  - name: 'Palaces Castles Enhanced'
+    after: [ 'Immersive Citizens' ]
+  - name: 'Races & Classes'
+    after: [ 'Palaces Castles Enhanced' ]
+  - name: 'Standing Stone Effects'
+    after: [ 'Races & Classes' ]
+  - name: 'Economy'
+    after: [ 'Races & Classes' ]
+  - name: 'Crafting'
+    after: [ 'Economy' ]
+  - name: 'Alchemy Overhauls'
+    after: [ 'Crafting' ]
+  - name: 'Skills & Perks'
+    after: [ 'Alchemy Overhauls' ]
+  - name: 'Vampire Gameplay Overhauls'
+    after: [ 'Skills & Perks' ]
+  - name: 'Core Mods'
+    after: [ 'Standing Stone Effects', 'Vampire Gameplay Overhauls' ]
+  - name: 'Alternate Start'
+    after: [ 'Core Mods' ]
+  - name: 'Follower Frameworks'
+    after: [ 'Alternate Start' ]
+  - name: 'Cell Music'
+    after: [ 'Follower Frameworks' ]
+  - name: 'Cell Encounter Zones'
+    after: [ 'Cell Music' ]
+  - name: 'Cell Water'
+    after: [ 'Cell Encounter Zones' ]
+  - name: 'Cell Weather & Lighting'
+    after: [ 'Cell Water' ]
+  - name: 'Open Cities Skyrim'
+    after: [ 'Cell Weather & Lighting' ]
+  - name: 'High Priority Overrides'
+    after: [ 'Open Cities Skyrim' ]
+  - name: 'Late Loaders'
+    after: [ 'High Priority Overrides' ]
+  - name: 'Khajiit Speak'
+    after: [ 'Late Loaders' ]
+  - name: 'Leveled List Modifiers'
+    after: [ 'Khajiit Speak' ]
+  - name: 'Map Markers'
+    after: [ 'Leveled List Modifiers' ]
+  - name: 'Lux Interior Lighting'
+    after: [ 'Map Markers' ]
+  - name: 'City Worldspace Movers'
+    after: [ 'Lux Interior Lighting' ]
+  - name: 'Elianora''''s Breezehome Overhaul'
+    after: [ 'City Worldspace Movers' ]
+  - name: 'Winterhold Restored'
+    after: [ 'Elianora''''s Breezehome Overhaul' ]
+  - name: 'Water Overhauls'
+    after: [ 'Winterhold Restored' ]
+  - name: 'No Grass'
+    after: [ 'Water Overhauls' ]
+  - name: 'Torch Lighting'
+    after: [ 'No Grass' ]
+  - name: 'Player Character Dialogue'
+    after: [ 'Torch Lighting' ]
+  - name: 'Worldspace Settings'
+    after: [ 'Player Character Dialogue' ]
+  - name: 'Conflict Resolution Patches (Late)'
+    after: [ 'Worldspace Settings' ]
+  - name: 'Paper Maps'
+    after: [ 'Conflict Resolution Patches (Late)' ]
+  - name: 'Dynamic Patches'
+    after: [ 'Paper Maps' ]
+  - name: 'Late Fixes & Changes'
+    after: [ 'Dynamic Patches' ]
+  - name: 'Dynamic LOD'
+    after: [ 'Late Fixes & Changes' ]
+plugins:
+  - name: 'Skyrim.esm'
+    group: 'Main Plugins'
+  - name: 'Update.esm'
+    group: 'Main Plugins'
+  - name: 'Dawnguard.esm'
+    group: 'Main Plugins'
+  - name: 'HearthFires.esm'
+    group: 'Main Plugins'
+  - name: 'Dragonborn.esm'
+    group: 'Main Plugins'
+  - name: 'SkyrimVR.esm'
+    group: 'Main Plugins'
+    after:
+      - 'Dragonborn.esm'
+  - name: 'cc[a-z]{3}sse\d{3}[-_]\w+\.es[lm]'
+    group: 'Creation Club'
+  - name: '_ResourcePack.esl'
+    group: 'Creation Club'
+  - name: 'unofficial skyrim special edition patch.esp'
+    group: 'Unofficial Patches'
+  - name: 'Unofficial ( {0}|Arcane Accessories {0}|(Arcane Archer|Expanded Crossbow|Saturalia Holiday) Pack {0}|Arms of Chaos {0}|Bittercup {0}|Bloodchill Manor {0}|Bone Wolf {0}|Bow of Shadows {0}|Chrysamere {0}|Civil War Champions {0}|(Daedric|Dragon|Dwarven|Ebony|Elven Hunter|Iron|Netch Leather|Orcish|Silver|Spell Knight|Stalhrim Fur|Steel Soldier|Vigil Enforcer) ?(Mail|Plate|Scaled?)? Armor(s| Set)? {0}|Dawnfang and Duskfang {0}|Dead Man''s Dread {0}|Divine Crusader {0}|Dwarven (Armored Mudcrab|Home) {0}|Elite Crossbows {0}|Farming {0}|Forgotten Seasons {0}|Gallows Hall {0}|Ghosts of the Tribunal {0}|Goblins {0}|Goldbrand {0}|Gray Cowl Returns {0}|Headmans Cleaver {0}|Hendraheim {0}|Lord''s Mail {0}|Myrwatch {0}|Necromantic Grimoire {0}|Nix-Hound {0}|Nordic Jewelry {0}|Pets of Skyrim {0}|Plague of the Dead {0}|Redguard Elite Armaments {0}|Ruin''s Edge {0}|Shadowfoot Sanctum {0}|Shadowrend {0}|Skyrim Creation Club Content {0}|Staff of Sheogorath {0}|Staves {0}|Stendarr''s Hammer {0}|Sunder & Wraithguard {0}|The (Cause|Contest) {0}|Tundra Homestead {0}|Umbra {0}|Wild Horses {0}|) Patch\.esl'
+    group: 'Unofficial Patches'
+  - name: 'Allinonefpsfix.esp'
+    group: 'Worldspace Settings'
+  - name: 'BloodOnTheIceQuestFix(USSEP)?.esp'
+    group: 'Fixes'
+  - name: 'Butterflies.esp'
+    group: 'Fixes'
+  - name: 'ButterfliesUnchained.esp'
+    after:
+      - 'Complete Alchemy & Cooking Overhaul.esp'
+  - name: 'GQJ_DG_vampireamuletfix.esp'
+    group: 'Fixes'
+  - name: 'Grass Cache Fixes.esp'
+    group: 'Worldspace Settings'
+  - name: 'Hearthfires Houses Building Fix.esp'
+    group: 'Fixes'
+  - name: 'MissingEZs(_AllExteriors|Fixed)\.esp'
+    group: 'Cell Encounter Zones'
+  - name: 'Modern Brawl Bug Fix.esp'
+    group: 'Late Fixes & Changes'
+  - name: 'Navigator-NavFixes.esl'
+    group: 'Fixes'
+  - name: 'Skyrim Project Optimization - (No Homes - )?Full( ESL)? Version\.esm'
+    group: 'Fixes'
+    after:
+      - 'unofficial skyrim special edition patch.esp'
+  - name: 'SmallEnviromentalFixes(SEF).esp'
+    group: 'Fixes'
+  - name: 'Unofficial Skyrim Modders Patch.esp'
+    after:
+      - 'ScriptFixesCompilation.esp'
+  - name: 'Unofficial Skyrim Modders Patch( VR)?\.esp'
+    group: 'Fixes'
+  - name: 'WindhelmGateFixes(_ESL)?\.esp'
+    group: 'Fixes'
+  - name: 'wolfs_LockpickingXPFix.esp'
+    group: 'Fixes'
+  - name: 'ScriptFixesCompilation.esp'
+    group: 'Script Fixes & Optimization'
+    after:
+      - 'unofficial skyrim special edition patch.esp'
+      - 'Vanilla Scripts Enhanced.esl'
+      - 'Vanilla Script MicroOptimizations.esl'
+  - name: 'SimplyOptimizedScripts.esl'
+    group: 'Script Fixes & Optimization'
+    after:
+      - 'Vanilla Script MicroOptimizations.esl'
+  - name: 'UOSC.esl'
+    group: 'Script Fixes & Optimization'
+    after:
+      - 'Vanilla Scripts Enhanced.esl'
+      - 'Vanilla Script MicroOptimizations.esl'
+  - name: 'Vanilla Scripts Enhanced.esl'
+    group: 'Script Fixes & Optimization'
+    after:
+      - 'Vanilla Script MicroOptimizations.esl'
+  - name: 'Vanilla Script MicroOptimizations.esl'
+    group: 'Script Fixes & Optimization'
+  - name: 'AutoBlend.esp'
+    group: 'Late Fixes & Changes'
+  - name: 'Automated Leveled List Addition.esp'
+    group: 'Dynamic Patches'
+  - name: 'Bashed Patch.*\.esp'
+    group: 'Dynamic Patches'
+    after:
+      - 'SSEMerged.esp'
+      - 'One ImCh Patch.esp'
+      - 'One ImCh Patcher.esp'
+  - name: 'DynDOLOD.*\.es(m|p)'
+    group: 'Dynamic LOD'
+  - name: 'MashedPatch.esp'
+    group: 'Dynamic Patches'
+  - name: 'Occlusion.esp'
+    group: 'Dynamic LOD'
+    after:
+      - 'DynDOLOD.esp'
+  - name: 'P(arallaxGen|G_\d+)\.esp'
+    group: 'Late Fixes & Changes'
+    after:
+      - 'AutoBlend.esp'
+  - name: 'Smashed Patch.esp'
+    group: 'Dynamic Patches'
+  - name: 'SSEMerged.esp'
+    group: 'Dynamic Patches'
+    after:
+      - 'One ImCh Patch.esp'
+      - 'One ImCh Patcher.esp'
+  - name: 'Synthesis.esp'
+    group: 'Late Fixes & Changes'
+  - name: 'zPatch.esp'
+    group: 'Dynamic Patches'
+  - name: 'BOS Master Occlusion.esm'
+    group: 'Fixes'
+  - name: 'FenixDisenchanter.esp'
+    group: 'Resources & Frameworks'
+  - name: 'I4IconAddon.esp'
+    group: 'Resources & Frameworks'
+  - name: 'RaceMenu.esp'
+    after:
+      - 'SkyUI_SE.esp'
+  - name: 'SkyUI_SE.esp'
+    group: 'Fixes'
+  - name: '___SNOW_FIX.esp'
+    group: 'Early Loaders'
+  - name: 'Better Dynamic Snow( SE)?\.esp'
+    group: 'Early Loaders'
+    after:
+      - 'SMIM-SE.esp'
+      - 'SMIM-SE-Merged-All.esp'
+      - '___SNOW_FIX.esp'
+  - name: 'dD - Enhanced Blood Main.esp'
+    after:
+      - 'Audio Overhaul Skyrim.esp'
+      - 'Immersive Sounds - Compendium.esp'
+  - name: 'dD - Enhanced Blood Main LITE.esp'
+    group: 'Fixes'
+  - name: 'Particle Patch( for ENB)?\.esp'
+    group: 'Fixes'
+  - name: 'SMIM-SE.*\.esp'
+    group: 'Early Loaders'
+  - name: 'dD - Realistic Ragdoll Force -.*.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'dD - Realistic Ragdoll Force - (Medium|High|Reduced)\.esp'
+    after:
+      - 'XPMSE.esp'
+  - name: 'Don''tTalkWithYourMouthFull.esp'
+    after:
+      - 'AnimatedEatingRedux.esp'
+  - name: 'FlowerGirls SE.esp'
+    after:
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'XPMSE.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Audio Overhaul Skyrim.esp'
+    group: 'Early Loaders'
+    after:
+      - 'SoS - The Dungeons.esp'
+  - name: 'Audio Overhaul Skyrim - Obsidian Weathers Patch.esp'
+    after:
+      - 'Audio Overhaul Skyrim - True Storms.esp'
+      - 'Obsidian Weathers - True Storms - Patch.esp'
+  - name: 'Audio Overhaul Skyrim - True Storms Patch.esp'
+    after:
+      - 'Obsidian Weathers - True Storms - Patch.esp'
+  - name: 'Immersive Sounds - Compendium.esp'
+    group: 'Early Loaders'
+    after:
+      - 'Audio Overhaul Skyrim.esp'
+      - 'Reverb and Ambiance Overhaul - Skyrim.esp'
+  - name: 'LSFX-SSE-Audiosettings.esp'
+    group: 'Fixes'
+  - name: 'MagiCollege.esp'
+    after:
+      - 'Complete Alchemy & Cooking Overhaul.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Immersive Music.esp'
+      - 'Immersive Music Replacer.esp'
+      - 'MCWT_ExpiditeTheExpirate.esp'
+      - 'MLU.esp'
+      - 'Requiem.esp'
+      - 'SoS - Civilization.esp'
+      - 'Soulmancer Soundtrack - NoVindDun.esp'
+      - 'SoundsofSkyrimComplete.esp'
+  - name: 'Player Home Tavern Music - Special Edition.esp'
+    group: 'Cell Music'
+    after:
+      - 'Soulmancer Soundtrack - NoVindDun.esp'
+  - name: 'Reverb and Ambiance Overhaul - Skyrim.esp'
+    group: 'Early Loaders'
+  - name: 'RAO - ELE - Alternate Start Patch.esp'
+    after:
+      - 'RAO - ELE patch SSE.esp'
+  - name: 'RAO - ELFX Patch.esp'
+    after:
+      - 'ELFXEnhancer.esp'
+      - 'ELFX - Hardcore.esp'
+  - name: 'Soulmancer Soundtrack - NoVindDun.esp'
+    group: 'Cell Music'
+  - name: 'SoundsofSkyrimComplete.esp'
+    after:
+      - 'LSFX-SSE-Audiosettings.esp'
+  - name: 'SoS - The Wilds.esp'
+    after:
+      - 'LSFX-SSE-Audiosettings.esp'
+  - name: 'SoS - Civilization.esp'
+    after:
+      - 'LSFX-SSE-Audiosettings.esp'
+  - name: 'SoS - The Dungeons.esp'
+    group: 'Early Loaders'
+    after:
+      - 'LSFX-SSE-Audiosettings.esp'
+  - name: 'Blacksmith Forge Water Fix SE( USSEP)?.esp'
+    after:
+      - 'Complete Alchemy & Cooking Overhaul.esp'
+      - 'MLU.esp'
+  - name: 'Natural Waterfalls.esp'
+    after:
+      - 'Landscape and Water Fixes.esp'
+      - 'RealisticWaterTwo - Resources.esm'
+      - 'Water for ENB.esm'
+  - name: 'RealisticWaterTwo - Resources.esm'
+    group: 'Resources & Frameworks'
+  - name: 'RealisticWaterTwo.esp'
+    group: 'Water Overhauls'
+  - name: 'VRWaterColor.esp'
+    group: 'Late Loaders'
+    after:
+      - 'RealisticWaterTwo.esp'
+  - name: 'VRWaterColor-(Blackreach|Volcanic)\.esp'
+    after:
+      - 'VRWaterColor.esp'
+  - name: 'SkyVRaan-WaterGrass.esp'
+    after:
+      - 'Landscape Fixes For Grass Mods.esp'
+  - name: 'Water for ENB( \((Mineral Teal|Shades of Skyrim|Tropical Green|Vanilla|Wavy Rivers)\))?\.esp'
+    group: 'Water Overhauls'
+  - name: 'Water for ENB - Patch - (Clear Interior Water|Clear Underwater|Transparent Horse Trough Water|Volcanic Water)\.esp'
+    after:
+      - 'Water for ENB.esp'
+      - 'Water for ENB (Mineral Teal).esp'
+      - 'Water for ENB (Shades of Skyrim).esp'
+      - 'Water for ENB (Tropical Green).esp'
+      - 'Water for ENB (Vanilla).esp'
+      - 'Water for ENB (Wavy Rivers).esp'
+  - name: 'Water for ENB - Patch - Blue Volcanic Water.esp'
+    after:
+      - 'Water for ENB.esp'
+      - 'Water for ENB (Shades of Skyrim).esp'
+      - 'Water for ENB (Wavy Rivers).esp'
+  - name: 'Water for ENB - Patch - (Cabbage ENB|Lakeview Manor Avant Garden EX)\.esp'
+    after:
+      - 'Water for ENB.esp'
+      - 'Water for ENB (Mineral Teal).esp'
+      - 'Water for ENB (Shades of Skyrim).esp'
+      - 'Water for ENB (Tropical Green).esp'
+      - 'Water for ENB (Vanilla).esp'
+      - 'Water for ENB (Wavy Rivers).esp'
+  - name: 'Water for ENB - Patch - (JKs Ragged Flagon|No Interior Fog)\.esp'
+    after:
+      - 'Water for ENB (Shades of Skyrim).esp'
+  - name: 'Water for ENB - Patch - Expanded Towns and Cities.esp'
+    after:
+      - 'ETaC - Complete.esp'
+      - 'ETaC - Riverwood.esp'
+  - name: 'Ambiance.esp'
+    group: 'Cell Weather & Lighting'
+  - name: 'ATLM.esp'
+    group: 'Resources & Frameworks'
+  - name: 'CS Light.esp'
+    group: 'Cell Weather & Lighting'
+    after:
+      - 'TL Bulbs ISL.esp'
+  - name: 'Darker Interior Ambient Fog.esp'
+    group: 'Cell Weather & Lighting'
+  - name: 'ELE_SSE.esp'
+    group: 'Cell Weather & Lighting'
+  - name: 'EnhancedLightsandFX.esp'
+    after:
+      - name: '3DNPC.esp'
+        condition: '(is_master("3DNPC.esp") and is_master("EnhancedLightsandFX.esp")) or (not is_master("3DNPC.esp") and not is_master("EnhancedLightsandFX.esp"))'
+      - name: 'SMIM-SE.esp'
+        condition: '(is_master("SMIM-SE.esp") and is_master("EnhancedLightsandFX.esp")) or (not is_master("SMIM-SE.esp") and not is_master("EnhancedLightsandFX.esp"))'
+      - name: 'SMIM-SE-Merged-All.esp'
+        condition: '(is_master("SMIM-SE-Merged-All.esp") and is_master("EnhancedLightsandFX.esp")) or (not is_master("SMIM-SE-Merged-All.esp") and not is_master("EnhancedLightsandFX.esp"))'
+  - name: 'ELFXEnhancer.esp'
+    group: 'Cell Weather & Lighting'
+  - name: 'ELFX - Hardcore.esp'
+    group: 'Cell Weather & Lighting'
+  - name: 'ELFX - Exteriors.esp'
+    after:
+      - name: 'AK - Placeable Statics SE.esp'
+        condition: '(is_master("AK - Placeable Statics SE.esp") and is_master("ELFX - Exteriors.esp")) or (not is_master("AK - Placeable Statics SE.esp") and not is_master("ELFX - Exteriors.esp"))'
+      - name: 'SMIM-SE-Merged-All.esp'
+        condition: '(is_master("SMIM-SE-Merged-All.esp") and is_master("ELFX - Exteriors.esp")) or (not is_master("SMIM-SE-Merged-All.esp") and not is_master("ELFX - Exteriors.esp"))'
+  - name: 'ELFX - Weathers.esp'
+    after:
+      - 'Audio Overhaul Skyrim.esp'
+  - name: 'ELFX Fixes.esp'
+    after:
+      - 'Skysan_ELFX_SMIM_Fix.esp'
+  - name: 'ELFX Fixes Ragged Flagon Fix.esp'
+    after:
+      - 'ELE_SSE.esp'
+      - 'ELFXEnhancer.esp'
+      - 'ELFX - Hardcore.esp'
+      - 'ELFX Fixes.esp'
+      - 'Luminosity Lighting Overhaul.esp'
+      - 'RLO - Interiors.esp'
+      - 'RealisticWaterTwo.esp'
+      - 'WSEnhancer.esp'
+  - name: 'EmbersHD.esp'
+    after:
+      - 'CinematicFireFX.esp'
+  - name: 'EmbersHD - RLO Patch.esp'
+    after:
+      - 'Realistic Lighting Overhaul - Major City Interiors.esp'
+  - name: 'Embers XD - Patch - Elis Breezehome.esp'
+    after:
+      - 'Lux - Embers XD patch.esp'
+  - name: 'ENB Light.esp'
+    group: 'Torch Lighting'
+  - name: 'ImprovedFog&Lighting.esp'
+    group: 'Cell Weather & Lighting'
+    after:
+      - 'Open Cities Skyrim.esp'
+      - 'SR Exterior Cities.esp'
+  - name: 'Lanterns Of Skyrim - All In One - Main.esm'
+    group: 'Early Loaders'
+  - name: 'Luminosity Lighting Overhaul.esp'
+    group: 'Cell Weather & Lighting'
+  - name: 'Lux.esp'
+    group: 'Cell Weather & Lighting'
+  - name: 'Lux - Mara Valentine patch.esp'
+    after:
+      - 'Lux - Distinct Interiors patch.esp'
+  - name: 'Lux - Silver Blood inn overhaul.esp'
+    after:
+      - 'Lux - Distinct Interiors patch.esp'
+  - name: 'Lux - Understone Keep overhaul.esp'
+    after:
+      - 'Lux - Distinct Interiors patch.esp'
+  - name: 'Lux - COTN (Dawnstar|Morthal|Winterhold) patch\.esp'
+    after:
+      - 'Lux - Distinct Interiors patch.esp'
+  - name: 'Lux - Flat Maps generic patch.esp'
+    after:
+      - 'FWMF for Fantasy Paper Maps.esp'
+      - 'FWMF for Paper Map by Mirhayasu.esp'
+      - 'FWMF Geology Survey Map.esp'
+      - 'FWMF Marked Clean Map.esp'
+      - 'FWMF Marked Old Map.esp'
+      - 'FWMF SE Marked Clean Map 4K.esp'
+      - 'FWMF SE Marked Old Map 4K.esp'
+      - 'FWMF SE Unmarked Clean Map 4K.esp'
+      - 'FWMF SE Unmarked Old Map 4K.esp'
+      - 'FWMF Skyrim and Solstheim Satellite Maps.esp'
+      - 'FWMF Unmarked Clean Map.esp'
+      - 'FWMF Unmarked Old Map.esp'
+  - name: 'Lux - Great Village of Old Hroldan patch.esp'
+    after:
+      - 'Lux - Distinct Interiors patch.esp'
+  - name: 'Lux - OCW College.esp'
+    after:
+      - 'OCW_CellSettings.esp'
+  - name: 'Lux - Rodryk''s Dragonbridge patch.esp'
+    after:
+      - 'Lux - Distinct Interiors patch.esp'
+  - name: 'Lux - SoS compatibility patch.esp'
+    after:
+      - 'Lux - BleakFalls Barrow patch.esp'
+      - 'Lux - Blue Palace Terrace patch 3.esp'
+      - 'Lux - Breezehome by Lupus patch.esp'
+      - 'Lux - Crimson Blood Armor patch.esp'
+      - 'Lux - Distinct Interiors patch.esp'
+      - 'Lux - Distinct Silver Blood inn patch.esp'
+      - 'Lux - Embershard Mine patch.esp'
+      - 'Lux - Halted Stream Camp patch.esp'
+      - 'Lux - HSTNF compatibility patch.esp'
+      - 'Lux - JK''s Angelines Aromatics patch.esp'
+      - 'Lux - JK''s Arcadia''s Cauldron patch.esp'
+      - 'Lux - JK''s Bannered Mare patch.esp'
+      - 'Lux - JK''s Bee and Barb patch.esp'
+      - 'Lux - JK''s Belethor''s General Goods patch.esp'
+      - 'Lux - JK''s Bits and Pieces patch.esp'
+      - 'Lux - JK''s Blue Palace patch.esp'
+      - 'Lux - JK''s Dragonsreach patch.esp'
+      - 'Lux - JK''s Drunken Huntsman patch.esp'
+      - 'Lux - JK''s New Gnisis Cornerclub patch.esp'
+      - 'Lux - JK''s Radiant Raiment patch.esp'
+      - 'Lux - JK''s Sadris Used Wares patch.esp'
+      - 'Lux - JK''s Sleeping Giant inn patch.esp'
+      - 'Lux - JK''s Warmaidens patch.esp'
+      - 'Lux - Mara Valentine patch.esp'
+      - 'Lux - RedBag''s Solitude patch.esp'
+      - 'Lux - Silver Blood inn overhaul.esp'
+      - 'Lux - Steepfall Burrow patch.esp'
+      - 'Lux - Ustengrav Revisited patch.esp'
+      - 'Lux - WhiteRiver Watch patch.esp'
+  - name: 'Lux - The Great Cities - Minor Cities and Towns patch.esp'
+    after:
+      - 'Lux - Distinct Interiors patch.esp'
+  - name: 'Lux - Water for ENB patch.esp'
+    after:
+      - 'Lux - USSEP patch.esp'
+      - 'Lux - CC Fish patch.esp'
+  - name: 'NAT.esp'
+    after:
+      - 'Audio Overhaul Skyrim.esp'
+  - name: 'Obsidian In Cathedral.esp'
+    after:
+      - 'SoS_Cathedral_Patch.esp'
+  - name: 'DarkerNights-ObsidianInCathedral.esp'
+    after:
+      - 'Obsidian In Cathedral.esp'
+  - name: 'Obsidian Weathers.esp'
+    after:
+      - 'Audio Overhaul Skyrim.esp'
+      - name: 'TrueStormsSE.esp'
+        condition: 'active("True Storms - Obsidian Weathers - Patch .esp")'
+  - name: 'RAID Weathers.esp'
+    after:
+      - 'WetandCold.esp'
+  - name: 'RedbellyMineMistFix.esp'
+    after:
+      - 'ELE_SSE.esp'
+      - 'ELFX - Hardcore.esp'
+      - 'ELFXEnhancer.esp'
+      - 'EnhancedLightsandFX.esp'
+      - 'Luminosity Lighting Overhaul.esp'
+      - 'RelightingSkyrim_SSE.esp'
+      - 'RLO - Interiors.esp'
+      - 'WSEnhancer.esp'
+      - 'WSEnhancerCW.esp'
+  - name: 'Realistic Torch Light SE.esp'
+    after:
+      - 'ELE_SSE.esp'
+      - 'ELFX - Hardcore.esp'
+      - 'Lux.esp'
+      - 'Luminosity Lighting Overhaul.esp'
+      - 'RLO - Interiors.esp'
+  - name: 'RLO - Illuminated Spells.esp'
+    after:
+      - 'RLO - Interiors.esp'
+  - name: 'RLO - Interiors.esp'
+    group: 'Cell Weather & Lighting'
+    after:
+      - name: 'Lux.esp'
+        condition: 'version("RLO - Interiors.esp", >=, "5.0.4")'
+  - name: 'Realistic Lighting Overhaul - Dawnguard Interiors.esp'
+    after:
+      - 'Realistic Lighting Overhaul - Major City Interiors.esp'
+      - 'Realistic Lighting Overhaul - Minor Cities and Town Interiors.esp'
+  - name: 'Realistic Lighting Overhaul - Dungeons.esp'
+    after:
+      - 'Realistic Lighting Overhaul - Major City Interiors.esp'
+      - 'Realistic Lighting Overhaul - Minor Cities and Town Interiors.esp'
+      - 'Realistic Lighting Overhaul - Dawnguard Interiors.esp'
+  - name: 'Realistic Lighting Overhaul - Minor Cities and Town Interiors.esp'
+    after:
+      - 'Realistic Lighting Overhaul - Major City Interiors.esp'
+  - name: 'WSEnhancer(CW)?\.esp'
+    group: 'Cell Weather & Lighting'
+  - name: 'WSLightFade.esp'
+    after:
+      - 'WSEnhancer.esp'
+  - name: 'Torch Brightness Radius.esp'
+    after:
+      - 'ELE_SSE.esp'
+      - 'ELFX - Hardcore.esp'
+      - 'Lux.esp'
+      - 'Luminosity Lighting Overhaul.esp'
+      - 'RLO - Interiors.esp'
+  - name: 'True Light.esp'
+    group: 'Early Loaders'
+  - name: 'TrueStormsSE.esp'
+    after:
+      - 'Audio Overhaul Skyrim.esp'
+      - 'ELFX - Weathers.esp'
+      - 'Realistic Lighting Overhaul - Weathers.esp'
+      - 'Obsidian Weathers - Wander Patch.esp'
+  - name: 'TruTorch Lighting - (All Torch Bulb Kind Baseforms|Torch Baseform )\.esp'
+    group: 'Torch Lighting'
+  - name: 'Window Shadows Ultimate.esp'
+    group: 'Cell Weather & Lighting'
+  - name: 'RaceMenuMorphsCBBE.esp'
+    after:
+      - 'RaceMenuPlugin.esp'
+  - name: 'Hair Replacer( Assets)?\.esp'
+    group: 'Fixes'
+  - name: 'Hair Replacer Assets.esp'
+    after:
+      - 'Hair Replacer.esp'
+  - name: 'aAxeRSCtweaks.esp'
+    after:
+      - 'RSChildren.esp'
+  - name: 'ImCh.esm'
+    after:
+      - 'SimpleChildren.esp'
+  - name: 'One ImCh Patch.*\.esp'
+    group: 'Dynamic Patches'
+  - name: 'Killable Children - RS.esp'
+    after:
+      - 'RSChildren.esp'
+  - name: 'Killable Children - TK.esp'
+    after:
+      - 'TKChildren.esp'
+  - name: 'RealisticRSChildren.esp'
+    after:
+      - 'RSChildren.esp'
+  - name: 'RSkyrimChildren.esm'
+    group: 'Fixes'
+  - name: 'TKAA.esp'
+    after:
+      - 'SR - USSEP patch.esp'
+  - name: 'AelaStandalone.esp'
+    after:
+      - 'Bijin AIO.esp'
+      - 'Bijin_AIO 2018.esp'
+      - 'Bijin_AIO-SV 2018.esp'
+      - 'Bijin Warmaidens.esp'
+  - name: 'Bijin AIO.esp'
+    after:
+      - 'cutting room floor.esp'
+      - 'Immersive Weapons.esp'
+      - 'ScopedBows.esp'
+  - name: 'Bijin NPCs.esp'
+    after:
+      - 'Bijin AIO.esp'
+      - 'Bijin_AIO 2018.esp'
+      - 'Bijin_AIO-SV 2018.esp'
+      - 'Immersive Weapons.esp'
+  - name: 'Bijin Warmaidens.esp'
+    after:
+      - 'Bijin AIO.esp'
+      - 'Bijin_AIO 2018.esp'
+      - 'Bijin_AIO-SV 2018.esp'
+      - 'cutting room floor.esp'
+      - 'Immersive Weapons.esp'
+      - 'ScopedBows.esp'
+  - name: 'Bijin Wives.esp'
+    after:
+      - 'Bijin AIO.esp'
+      - 'Bijin_AIO 2018.esp'
+      - 'Bijin_AIO-SV 2018.esp'
+  - name: '(Serana|Valerica)\.esp'
+    after:
+      - name: 'Bijin_AIO-SV 2018.esp'
+  - name: 'Bijin(_AIO 2018|_AIO-SV 2018)\.esp'
+    after:
+      - 'cutting room floor.esp'
+      - 'Immersive Weapons.esp'
+      - 'ScopedBows.esp'
+  - name: 'Bijin_Frea-Iona.esp'
+    after:
+      - 'Bijin AIO.esp'
+      - 'Bijin_AIO 2018.esp'
+      - 'Bijin_AIO-SV 2018.esp'
+      - 'Bijin Warmaidens.esp'
+  - name: 'CosmeticVampireOverhaul.esp'
+    after:
+      - 'Better Vampire NPCs.esp'
+      - 'DIVERSE SKYRIM.esp'
+      - name: 'ethereal_elven_overhaul.esp'
+        condition: 'file("ethereal_elven_overhaul.esp") and file("ethereal_elven_overhaul\.bsa")'
+  - name: 'ethereal_elven_overhaul.esp'
+    after:
+      - 'CollegeOfWinterholdImmersive.esp'
+      - 'cutting room floor.esp'
+      - 'Immersive Weapons.esp'
+      - 'Joy of Perspective.esp'
+      - 'MLU.esp'
+      - 'ScopedBows.esp'
+  - name: 'NPCs of Dibella - Females.esp'
+    after:
+      - 'Immersive Weapons.esp'
+  - name: 'The Ordinary Women.esp'
+    after:
+      - 'cutting room floor.esp'
+  - name: 'Toccata as Elisif.esp'
+    after:
+      - 'PAN_NPCs.esp'
+  - name: 'WICO - Immersive People.esp'
+    after:
+      - 'Heights_of_Skyrim.esp'
+      - 'HOS - USSEP Patch.esp'
+  - name: 'AsharaSkyrimCharacterPresetsReplacer.esp'
+    group: 'Fixes'
+  - name: 'Better_Male_Presets.esp'
+    group: 'Fixes'
+  - name: 'Kayla_CharPreset.esp'
+    group: 'Fixes'
+  - name: 'Lagertha_CharPreset.esp'
+    group: 'Fixes'
+  - name: 'Lydia Face Preset 64bit.esp'
+    group: 'Fixes'
+  - name: 'Ambriel.esp'
+    group: 'New Content'
+  - name: 'Endgame NPC Overhaul.esp'
+    after:
+      - 'AmazingFollowerTweaks.esp'
+      - 'UFO - Ultimate Follower Overhaul.esp'
+  - name: 'Rigmor.esp'
+    after:
+      - name: 'cutting room floor.esp'
+        condition: 'not is_master("Rigmor.esp")'
+      - name: 'ETaC - Complete.esp'
+        condition: '(is_master("Rigmor.esp") and is_master("ETaC - Complete.esp")) or (not is_master("Rigmor.esp") and not is_master("ETaC - Complete.esp"))'
+      - name: 'ETaC - Dawnstar.esp'
+        condition: 'not is_master("Rigmor.esp")'
+      - name: 'ETaC - Riverwood.esp'
+        condition: 'not is_master("Rigmor.esp")'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: 'not is_master("Rigmor.esp")'
+  - name: 'Sofia - Immersive Citizens Patch.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'Sofia - RDO Patch.esp'
+    after:
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'zMirai.esp'
+    after:
+      - 'S3DTrees NextGenerationForests.esp'
+  - name: 'Arena.esp'
+    after:
+      - 'MLU.esp'
+  - name: 'Durnehviir God of Death.esp'
+    after:
+      - 'KS Dragon Overhaul 2.esp'
+  - name: 'Durnehviir God of Death - Remastered.esp'
+    after:
+      - 'DurnehviirResurrected.esp'
+  - name: 'DwemerSpectresLegendary.esp'
+    after:
+      - 'Skyrim Immersive Creatures Special Edition.esp'
+  - name: 'KS Dragon Overhaul 2.esp'
+    after:
+      - 'Mortal Enemies.esp'
+      - 'Serio''s Enhanced Dragons.esp'
+      - 'SkyTEST-HarderCreatures.esp'
+  - name: 'MightifiedBellyachesDragons.esp'
+    after:
+      - 'RevampedReleveled.esp'
+      - 'Skyrim Revamped - Complete Enemy Overhaul.esp'
+  - name: 'OBIS SE.esp'
+    after:
+      - 'Cloaks.esp'
+      - 'DIVERSE SKYRIM.esp'
+  - name: 'Rebalanced Encounter Zones.*\.esp'
+    after:
+      - 'MLU.esp'
+      - 'MLU_EZupdate.esp'
+      - 'MLU - Vanilla Encounter Zones.esp'
+  - name: 'Skyrim Revamped - Complete Enemy Overhaul.esp'
+    after:
+      - 'Cloaks.esp'
+      - 'Combat Evolved.esp'
+      - 'Immersive Weapons.esp'
+      - 'Skyrim Immersive Creatures Special Edition.esp'
+      - 'Smilodon - Combat of Skyrim.esp'
+      - 'WICO - Immersive People.esp'
+      - 'Wildcat - Combat of Skyrim.esp'
+  - name: 'WorldEaterBeater.esp'
+    after:
+      - 'DeadlyDragons.esp'
+  - name: 'Zim''s Improved Dremora.esp'
+    after:
+      - 'MLU.esp'
+  - name: '(CollegeStudents|ICNs_ImmersiveCollegeNPCs)\.esp'
+    group: 'New Content'
+  - name: 'DIVERSE SKYRIM.esp'
+    after:
+      - 'Kireina SSE.esl'
+      - 'Kireina SSE.esp'
+  - name: 'Ducks and Swans.esp'
+    group: 'New Content'
+  - name: 'Immersive Wenches.esp'
+    group: 'New Content'
+  - name: 'KrittaKittyHorsesForSSE.esp'
+    after:
+      - 'Convenient Horses.esp'
+  - name: 'MarkekrausSentientChairsOfSkyrim.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Immersive Citizens - OCS patch.esp'
+  - name: 'Alpine Forest of Whiterun Valley.esp'
+    after:
+      - 'BSHeartland.esm'
+      - 'unofficial skyrim special edition patch.esp'
+  - name: 'Blowing in the Wind SSE.esp'
+    group: 'Early Loaders'
+    after:
+      - 'AK - Placeable Statics SE.esp'
+      - 'Destructible Skyrim.esp'
+  - name: 'Blowing in the Wind - ELFX Exteriors Patch SSE.esp'
+    after:
+      - 'Blowing in the Wind - Lanterns of Skyrim Patch SSE.esp'
+      - 'Blowing in the Wind - Lanterns of Skyrim SE - MCM versionPatch.esp'
+      - 'Blowing in the Wind - SMIM Merged All Patch SSE.esp'
+  - name: 'Blowing in the Wind - Lanterns of Skyrim Patch SSE.esp'
+    group: 'Early Loaders'
+  - name: 'Blowing in the Wind - SMIM Merged All Patch SSE.esp'
+    group: 'Early Loaders'
+    after:
+      - 'Blowing in the Wind - Lanterns of Skyrim Patch SSE.esp'
+      - 'Blowing in the Wind - Lanterns of Skyrim SE - MCM versionPatch.esp'
+  - name: 'Cathedral Landscapes.esp'
+    after:
+      - 'MajesticMountains.esp'
+      - 'ViscousGrass.esp'
+      - 'Verdant - A Skyrim Grass Plugin SSE Version.esp'
+  - name: 'Cathedral - 3D Pine Grass.esp'
+    after:
+      - 'Cathedral Landscapes.esp'
+  - name: 'Destructible Skyrim.esp'
+    group: 'Early Loaders'
+    after:
+      - 'AK - Placeable Statics SE.esp'
+  - name: 'Enhanced Landscapes - Dead Marsh.esp'
+    after:
+      - 'Enhanced Landscapes - Barren Marsh.esp'
+  - name: 'Enhanced Landscapes - (Grass|Green Fields)\.esp'
+    after:
+      - 'Enhanced Landscapes.esp'
+      - 'Skyrim Flora Overhaul.esp'
+  - name: 'Enhanced Landscapes - Green Fields.esp'
+    after:
+      - 'Enhanced Landscapes - Grass.esp'
+  - name: '(Enhanced Vanilla Trees SSE|SRG Enhanced Trees Activator)\.esp'
+    after:
+      - 'Skyrim Flora Overhaul.esp'
+  - name: 'Enhanced Vanilla Trees SSE.esp'
+    after:
+      - '3dTree-OnlyPlant.esp'
+  - name: 'FarmhouseChimneys.esp'
+    group: 'New Content'
+  - name: 'Faultier''s PBR landscapes.esp'
+    after:
+      - 'Better Dynamic Ash.esp'
+      - 'Better Dynamic Snow SE.esp'
+      - 'BlendedRoads.esp'
+  - name: 'gildergreen regrown.esp'
+    group: 'Early Loaders'
+  - name: 'Grass Field.esp'
+    group: 'Early Loaders'
+  - name: 'HappyLittleShrubs - SLaWF Patch.esp'
+    after:
+      - 'HappyLittleShrubs - USSEP Patch.esp'
+  - name: 'HappyPBRTrees.esp'
+    after:
+      - 'HappyLittleTrees.esp'
+  - name: 'HD Lods SSE.esp'
+    group: 'Fixes'
+    after:
+      - 'TerrainLodRedone.esp'
+  - name: 'Holy Mountains.esp'
+    after:
+      - 'MajesticMountains.esp'
+  - name: 'Icfur Exist PBR landscapes.esp'
+    after:
+      - 'Better Dynamic Ash.esp'
+      - 'Better Dynamic Snow SE.esp'
+      - 'BlendedRoads.esp'
+  - name: 'Immersive Farms.esp'
+    group: 'New Content'
+  - name: 'Skyrim Landscape and Water Fixes - Light Sources.esp'
+    group: 'Fixes'
+  - name: 'Landscape and Water Fixes - Patch - Alternate Start - LFfGM.esp'
+    after:
+      - 'Landscape and Water Fixes - LFfGM - GotT - Water for ENB patch.esp'
+      - 'Landscape and Water Fixes - LFfGM - GotT patch.esp'
+      - 'Landscape and Water Fixes - LFfGM - Water for ENB patch.esp'
+      - 'Landscape and Water Fixes - Patch - LFfGM.esp'
+  - name: 'Landscape and Water Fixes - Patch - LFfGM - GotT.esp'
+    after:
+      - 'Undriel_QuaintRavenRock.esp'
+  - name: 'Landscape Fixes For Grass Mods.esp'
+    after:
+      - name: 'Midsummer - Stylised Grass for Skyrim SE.esp'
+        condition: '(is_master("Midsummer - Stylised Grass for Skyrim SE.esp") and is_master("Landscape Fixes For Grass Mods.esp")) or (not is_master("Midsummer - Stylised Grass for Skyrim SE.esp") and not is_master("Landscape Fixes For Grass Mods.esp"))'
+      - name: 'Verdant - A Skyrim Grass Plugin SSE Version.esp'
+        condition: '(is_master("Verdant - A Skyrim Grass Plugin SSE Version.esp") and is_master("Landscape Fixes For Grass Mods.esp")) or (not is_master("Verdant - A Skyrim Grass Plugin SSE Version.esp") and not is_master("Landscape Fixes For Grass Mods.esp"))'
+      - name: 'ViscousGrass.esp'
+        condition: '(is_master("ViscousGrass.esp") and is_master("Landscape Fixes For Grass Mods.esp")) or (not is_master("ViscousGrass.esp") and not is_master("Landscape Fixes For Grass Mods.esp"))'
+  - name: 'Landscape (Fixes )?For Grass Mods .*\.esp'
+    after:
+      - 'Landscape Fixes For Grass Mods.esp'
+  - name: 'Landscape Fixes For Grass mods - Alternate start Locations.esp'
+    after:
+      - 'Landscape and Water Fixes - LFfGM - GotT - Water for ENB patch.esp'
+      - 'Landscape and Water Fixes - LFfGM - GotT patch.esp'
+      - 'Landscape and Water Fixes - LFfGM - Water for ENB patch.esp'
+      - 'Landscape and Water Fixes - Patch - LFfGM.esp'
+  - name: 'Landscape For Grass Mods - Arthmoor''s Dragon Bridge PATCH.esp'
+    after:
+      - 'dragon bridge.esp'
+  - name: 'Landscape For Grass Mods -Immersive Citizens PATCH.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'Landscape For Grass Mods JK''S Skyrim.esp'
+    after:
+      - 'JKs Skyrim.esp'
+  - name: 'MajesticMountains.esp'
+    after:
+      - 'Skyrim Flora Overhaul.esp'
+      - 'Tamriel Reloaded HD SE.esp'
+      - 'ViscousGrass.esp'
+  - name: 'NoGrassias( (Extended|Lite|Ultimate))?\.esp'
+    group: 'No Grass'
+  - name: 'NoGrassINCaves.esp'
+    group: 'No Grass'
+  - name: 'NoGrassINCities.esp'
+    group: 'No Grass'
+  - name: 'Northern Roads.esp'
+    after:
+      - 'Vanilla Landscape Corrections.esp'
+  - name: 'Prometheus_No_snow_Under_the_roof.esp'
+    group: 'Early Loaders'
+  - name: 'NSUTR_(bugfixes|groundsnow_mesh_fixes|improvements|Static_fix)\.esp'
+    group: 'Early Loaders'
+  - name: 'S3DTrees NextGenerationForests.esp'
+    after:
+      - 'Bent Pines.esp'
+      - 'fallentreebridgesSSE.esp'
+      - 'Verdant - A Skyrim Grass Plugin SSE Version.esp'
+      - 'ViscousGrass.esp'
+      - 'WhiterunHoldForest.esp'
+      - 'Whiterun Forest Borealis.esp'
+  - name: 'SimplyBiggerTreesSE.esp'
+    after:
+      - '3dTree-OnlyPlant.esp'
+  - name: 'Skyrim Flora Overhaul.esp'
+    after:
+      - 'SimplyBiggerTreesSE.esp'
+  - name: 'SkyrimImprovedPuddles-DG-HF-DB.esp'
+    group: 'Fixes'
+  - name: 'Tamriel Reloaded HD SE.esp'
+    group: 'Early Loaders'
+  - name: 'TerrainLodRedone.esp'
+    group: 'Fixes'
+  - name: 'WhiterunHoldForest.esp'
+    after:
+      - 'unofficial skyrim special edition patch.esp'
+  - name: 'BA_Sorting_BCS.esp'
+    after:
+      - 'BA_LostLibrary.esp'
+  - name: 'BA_Sorting_LotD.esp'
+    after:
+      - 'BA_LegacyoftheDragonborn.esp'
+  - name: 'Immersive Needs ESL.esp'
+    after:
+      - 'Growl - Werebeasts of Skyrim.esp'
+  - name: 'Joy of Perspective.esp'
+    after:
+      - 'Endgame NPC Overhaul.esp'
+      - 'UNP Vanilla Outfits.esp'
+  - name: 'kinggathcreations_eastempirecompany.esp'
+    group: 'New Content'
+  - name: 'LokiHorses.esp'
+    after:
+      - 'Convenient Horses.esp'
+  - name: 'open cities skyrim.esp'
+    group: 'City Worldspace Movers'
+  - name: 'ocs + lotd5 patch.esp'
+    after:
+      - name: 'BluePalaceTerrace-OCS-patch.esp'
+        condition: 'active("MPXP1.3 [PATCH - DBPT.SSkwy.LotD] (OCS).esp")'
+  - name: 'Open World Loot.esp'
+    after:
+      - 'Awesome Artifacts.esp'
+  - name: 'OPHybrid.esp'
+    group: 'Early Loaders'
+  - name: 'Protected NPCs.esp'
+    group: 'Early Loaders'
+  - name: 'ProtectUniqueNPCs.esp'
+    group: 'Early Loaders'
+  - name: 'Requiem.esp'
+    group: 'Core Mods'
+  - name: 'Requiem Record Fixes.esm'
+    group: 'Fixes'
+  - name: 'Requiem for the Indifferent.esp'
+    group: 'Late Fixes & Changes'
+  - name: 'Requiem - Minor Arcana - Roleplaying.esp'
+    after:
+      - 'Requiem - Warmonger Armory.esp'
+  - name: 'SurvivalModeImproved.esp'
+    group: 'Early Loaders'
+  - name: 'TouringCarriages.esp'
+    after:
+      - name: 'MoreToSay.esp'
+        condition: 'not is_master("TouringCarriages.esp")'
+      - name: 'moretosayfalkreath.esp'
+        condition: 'not is_master("TouringCarriages.esp")'
+  - name: 'TouringCarriages-ICAIO.esp'
+    after:
+      - 'Immersive Citizens - TC patch.esp'
+  - name: 'tpos_ultimate_esm.esp'
+    after:
+      - 'alternate start - live another life.esp'
+  - name: 'tpos_complete02_RTCWG.esp'
+    after:
+      - 'Landscape Fixes For Grass Mods.esp'
+      - 'tposcw.esp'
+  - name: 'Riverwood_By_Nesbit.esp'
+    after:
+      - 'tposcw.esp'
+  - name: 'tpos_Riverwood_Grove.esp'
+    after:
+      - 'tposcw.esp'
+  - name: 'WARZONES - SSE - Civil Unrest.esp'
+    group: 'New Content'
+  - name: 'WARZONES - SSE - DLC - Assault Attack.esp'
+    group: 'New Content'
+  - name: 'WoodworkersWhim.esp'
+    group: 'Crafting'
+    after:
+      - 'Complete Crafting Overhaul_Remastered.esp'
+      - 'CRAFT.esp'
+  - name: 'Worldspace Transition Tweaks - Skyrim To Solstheim.esp'
+    group: 'Fixes'
+    after:
+      - 'unofficial skyrim special edition patch.esp'
+  - name: 'WTT - Skyrim-Solstheim - Worldsettings.esp'
+    group: 'Worldspace Settings'
+  - name: 'Aetherius.esp'
+    group: 'Races & Classes'
+  - name: 'DWKaPoTunRace.esp'
+    group: 'Races & Classes'
+  - name: 'Imperious - Races of Skyrim.esp'
+    group: 'Races & Classes'
+  - name: 'Immersive Movement.esp'
+    group: 'Early Loaders'
+  - name: 'Immersive Movement - Mortal Enemies Patch.esp'
+    after:
+      - 'Mortal Enemies.esp'
+      - 'Mortal Enemies - No RunWalk Changes.esp'
+      - 'Mortal Enemies - Rival Remix.esp'
+      - 'Mortal Enemies - Rival Remix - NoRunWalkChanges.esp'
+      - 'Mortal Enemies - 2.0 Test Version.esp'
+  - name: 'Mortal Enemies( - No RunWalk Changes| - Rival Remix( - NoRunWalkChanges)?| - 2.0 Test Version)?\.esp'
+    group: 'Early Loaders'
+    after:
+      - 'Immersive Movement.esp'
+  - name: 'NoBSAIProjectileDodge.esp'
+    after:
+      - 'UltimateCombat.esp'
+  - name: '(Smilodon|Wildcat) - Combat of Skyrim\.esp'
+    after:
+      - 'Animal Tweaks.esp'
+      - 'Immersive Movement.esp'
+      - 'Immersive NPC in the dark.esp'
+      - 'New Weapon Parry.esp'
+      - 'SkyRe_Main.esp'
+      - 'SkyRe_Combat.esp'
+      - 'SkyRe_EnemyAI.esp'
+  - name: '(Smilodon|Wildcat) - Realistic Damage Plugin\.esp'
+    after:
+      - 'Combat Evolved.esp'
+  - name: 'Vigor - Combat and Injuries (SE).esp'
+    after:
+      - 'Wildcat - Combat of Skyrim.esp'
+      - 'Smilodon - Combat of Skyrim.esp'
+  - name: 'AlchemyAdjustments(-AwesomePotionsPatch)?\.esp'
+    after:
+      - 'EconomyOverhaulandSpeechcraftImprovements.esp'
+      - 'EconomyOverhaulandSpeechcraftImprovementsLite.esp'
+  - name: 'AlchemyAdjustments.esp'
+    after:
+      - 'SkyTEST-RealisticAnimals&Predators.esp'
+  - name: 'Apothecary.esp'
+    after:
+      - 'TechnicolorAlchemy.esp'
+  - name: 'Complete Alchemy & Cooking Overhaul.esp'
+    group: 'Alchemy Overhauls'
+    after:
+      - 'Complete Crafting Overhaul_Remastered.esp'
+      - 'iNeed.esp'
+      - 'iNeed - Dangerous Diseases.esp'
+  - name: 'Complete Crafting Overhaul_Remastered.esp'
+    group: 'Crafting'
+    after:
+      - 'waccf_armor and clothing extension.esp'
+  - name: 'CRAFT.esp'
+    group: 'Crafting'
+    after:
+      - 'Complete Crafting Overhaul_Remastered.esp'
+  - name: 'Favor Jobs Overhaul.esp'
+    after:
+      - 'At Your Own Pace - Thane Overhaul.esp'
+      - 'Complete Alchemy & Cooking Overhaul.esp'
+      - 'Completionist.esp'
+      - 'CT_FavorJobsChanges.esp'
+      - 'EconomyOverhaulandSpeechcraftImprovements.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'iNeed.esp'
+    after:
+      - 'SkyUI_SE.esp'
+  - name: 'iNeed - Extended.esp'
+    after:
+      - 'AnotherSortingMod_2017-SSE.esp'
+      - 'Weapons Armor Clothing & Clutter Fixes.esp'
+  - name: 'RealisticNeedsandDiseases.esp'
+    after:
+      - 'Hunterborn.esp'
+      - 'Weapons Armor Clothing & Clutter Fixes.esp'
+  - name: 'SAFO.esp'
+    after:
+      - 'Betterfoodeffects.esp'
+  - name: 'Skyrim Alchemy Fixed - Ordinator.esp'
+    after:
+      - 'Ordinator - Perks of Skyrim.esp'
+  - name: '_tck_SpellCrafting.esp'
+    after:
+      - 'OCW_Obscure''s_CollegeofWinterhold.esp'
+  - name: 'Awesome Artifacts.esp'
+    after:
+      - 'Complete Alchemy & Cooking Overhaul.esp'
+      - 'Complete Crafting Overhaul_Remastered.esp'
+      - 'cutting room floor.esp'
+      - 'Guard Dialogue Overhaul.esp'
+      - 'WACCF_VanillaDaedricWeapons.esp'
+      - 'WACCF_VanillaDragonPriestMasks.esp'
+      - 'WACCF_VanillaOrcishWeapons.esp'
+      - 'Weapons Armor Clothing & Clutter Fixes.esp'
+  - name: 'Awesome Artifacts - DBM Patch.esp'
+    after:
+      - 'DBM_WACCF_Patch.esp'
+  - name: 'Bounty Gold.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'CoinPurseIncrease.esp'
+    group: 'Leveled List Modifiers'
+  - name: 'Containers and Leveled Lists Fixes.esp'
+    group: 'Economy'
+    after:
+      - 'MLU.esp'
+  - name: 'CLLF - CACO Patch.esp'
+    after:
+      - 'CLLF - Lock Related Loot for SCCR.esp'
+      - 'CLLF - Skyrim Coin Replacer Redux.esp'
+  - name: 'DLCIntegration( Beyond Skyrim Compatibility Patch)?\.esp'
+    group: 'New Content'
+  - name: 'EconomyOverhaulandSpeechcraftImprovements(Lite)?\.esp'
+    after:
+      - 'You Hunger.esp'
+  - name: 'EconomyOverhaul CV - (Vokrii|Ordinator) Patch.esp'
+    after:
+      - 'EconomyOverhaul CV - MorrowLootUltimate Patch.esp'
+  - name: 'Hybrid Loot and EZs.esp'
+    after:
+      - 'LoreWorthyBandits.esp'
+      - 'waccf_armor and clothing extension.esp'
+      - 'Weapon AF.esp'
+      - 'Weapons Armor Clothing & Clutter Fixes.esp'
+  - name: 'Immersive Ingestibles.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'ImprovedDaedricArtifacts(LightEbonyMail)?\.esp'
+    after:
+      - 'MLU.esp'
+  - name: 'Infinite Gold For Merchants.esp'
+    after:
+      - 'Relationship Dialogue Overhaul.esp'
+      - 'VendorSaleDelay-Gone.esp'
+  - name: 'J42_ArmorRatingRedux.esp'
+    after:
+      - 'Combat Evolved.esp'
+      - 'Wildcat - Combat of Skyrim.esp'
+      - 'Smilodon - Combat of Skyrim.esp'
+  - name: 'MLU.esp'
+    group: 'Economy'
+  - name: 'MLU - .*\.esp'
+    after:
+      - 'MLU.esp'
+  - name: 'MLU - AAE Ultimate Edition.esp'
+    after:
+      - 'MLU - Immersive Armors.esp'
+  - name: 'Scarcity SE - Less Loot Mod.esp'
+    group: 'Leveled List Modifiers'
+    after:
+      - 'WACCF_BashedPatchLvlListFix.esp'
+  - name: 'Scarcity SE - (2|4|6|8|10)x (Loot|Merchant Item) Rarity\.esp'
+    group: 'Leveled List Modifiers'
+    after:
+      - 'Scarcity SE - Less Loot Mod.esp'
+  - name: 'Skyrim Revamped.esp'
+    after:
+      - 'LoreWorthyBandits.esp'
+      - 'waccf_armor and clothing extension.esp'
+      - 'Weapon AF.esp'
+      - 'Weapons Armor Clothing & Clutter Fixes.esp'
+  - name: 'trade & barter.esp'
+    group: 'Economy'
+    after:
+      - 'Containers and Leveled Lists Fixes.esp'
+      - 'EconomyOverhaulandSpeechcraftImprovements.esp'
+      - 'MLU.esp'
+  - name: 'TTR_Master_Trader.*\.esp'
+    after:
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'Weapons Armor Clothing & Clutter Fixes.esp'
+    after:
+      - name: 'Guard Dialogue Overhaul.esp'
+        condition: 'checksum("Guard Dialogue Overhaul.esp", 6ABC1129) or version("Guard Dialogue Overhaul.esp", >=, "2.17")'
+      - 'TAR-GuildMaster1stPersonFix.esp'
+      - name: 'Undeath.esp'
+        condition: 'checksum("Undeath.esp", EB75A960)'
+      - 'UnlimitedBookshelves.esp'
+  - name: 'WACCF_BashedPatchLvlListFix.esp'
+    group: 'Leveled List Modifiers'
+  - name: 'WhitePhialBetterAlignments.esp'
+    after:
+      - 'Complete Alchemy & Cooking Overhaul.esp'
+      - 'SAFO.*\.esp'
+  - name: 'You Hunger.esp'
+    after:
+      - 'iNeed.esp'
+      - 'iNeed - Extended.esp'
+      - 'RealisticNeedsandDiseases.esp'
+      - 'Super Simple Needs.esp'
+  - name: 'Andromeda - Unique Standing Stones of Skyrim.esp'
+    group: 'Standing Stone Effects'
+  - name: 'Better Vampires.esp'
+    group: 'Vampire Gameplay Overhauls'
+    after:
+      - 'EBM_UnlimitedPower.esp'
+      - 'EBM_UnlimitedPower_Vampire.esp'
+      - 'Requiem.esp'
+      - 'Sacrosanct - Vampires of Skyrim.esp'
+      - 'Tainted_Blood.esp'
+  - name: 'Clairvoyance.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'Evenstar - Minimalistic Standing Stones of Skyrim.esp'
+    group: 'Standing Stone Effects'
+  - name: 'Freyr - Integrated Standing Stones of Skyrim.esp'
+    group: 'Standing Stone Effects'
+  - name: 'Mundus.esp'
+    group: 'Standing Stone Effects'
+  - name: 'Odin - Skyrim Magic Overhaul.esp'
+    after:
+      - 'AltmerSisters.esp'
+  - name: 'PatronGodsOfSkyrim.esp'
+    after:
+      - 'Complete Alchemy & Cooking Overhaul.esp'
+  - name: 'Predator Vision.esp'
+    after:
+      - 'Complete Alchemy & Cooking Overhaul.esp'
+  - name: 'YASTM_( {0}|CCRareCurios {0}|CCSaintsAndSeducers {0}|GuardDialogueOverhaul {0}|ImmersiveSoundsCompendium {0}|Inigo {0}|LucienAnniversaryEdition {0}|LucienCCRareCurios {0}|LucienCCSaintsAndSeducers {0}|MultiLayerParallaxSoulGems {0}|MultiLayerParallaxSoulGemsISC {0}|PraedysSoulGems {0}|PraedysSoulGemsISC {0}|RUSTICSOULGEMSSorted {0}|RUSTICSOULGEMSSortedISC {0}|RUSTICSOULGEMSUnsorted {0}|RUSTICSOULGEMSUnsortedISC {0}|SkyrimRemasteredSoulGems {0}|SkyrimRemasteredSoulGemsISC {0}|TamrielicCulture {0}|TheHangingGardens {0}|Undeath {0}|Vigilant {0}|)Patch\.esp'
+    after:
+      - 'YASTM_MCM.esp'
+  - name: 'AmazingFollowerTweaks.esp'
+    after:
+      - 'dovahbit.esp'
+      - 'FCO - Follower Commentary Overhaul.esp'
+      - 'Qw_BeyondReach_USSEP Patch.esp'
+  - name: 'Convenient Horses.esp'
+    after:
+      - 'AmazingFollowerTweaks.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'EFFDialogue.esp'
+    after:
+      - 'BUVARP.esp'
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'Immersive Horses.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'Minimalistic Follower Framework.esp'
+    group: 'Follower Frameworks'
+  - name: 'nwsFollowerFramework.esp'
+    group: 'Follower Frameworks'
+    after:
+      - 'Qw_BeyondReach_USSEP Patch.esp'
+  - name: 'Serious Civil War Fort Commanders.esp'
+    after:
+      - 'Neutral Civil War Forts Respawn.esp'
+  - name: 'SkyTEST-HarderCreatures.esp'
+    after:
+      - 'Mortal Enemies.esp'
+  - name: 'AI Overhaul.esp'
+    after:
+      - 'cutting room floor.esp'
+  - name: 'BA_KhajiitSpeakRedux_MAIN.esp'
+    group: 'Player Character Dialogue'
+  - name: 'BA_KSR_.*\.esp'
+    after:
+      - 'BA_KhajiitSpeakRedux_MAIN.esp'
+      - 'mjhKhajiitSpeak.esp'
+  - name: 'Better Stealth AI for Followers.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'BUVARP SE RE.esp'
+    after:
+      - 'DawnguardArsenal.esp'
+  - name: 'dwagonbown goes uwu.esp'
+    group: 'Player Character Dialogue'
+  - name: 'Guard Dialogue Overhaul.esp'
+    after:
+      - 'Ambriel.esp'
+      - 'cutting room floor.esp'
+      - 'Hothtrooper44_ArmorCompilation.esp'
+  - name: 'Hunters Not Bandits.esp'
+    after:
+      - 'BugfixCompilation.esp'
+      - 'Guard Dialogue Overhaul.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'Immersive Citizens - AI Overhaul.esp'
+    group: 'Immersive Citizens'
+  - name: 'ImprovedCompanionsBoogaloo.esp'
+    after:
+      - 'FCO - Follower Commentary Overhaul.esp'
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'Misc Dialogue Edits.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'More Dialogue Options.esp'
+    after:
+      - 'Misc Dialogue Edits.esp'
+  - name: 'mjhKhajiitSpeak.esp'
+    group: 'Player Character Dialogue'
+    after:
+      - 'BA_KhajiitSpeakRedux_MAIN.esp'
+  - name: 'mjhKhajiitSpeakMod.*\.esp'
+    after:
+      - 'BA_KhajiitSpeakRedux_MAIN.esp'
+      - 'mjhKhajiitSpeak.esp'
+  - name: 'Realistic AI Detection 2 SE.*\.esp'
+    after:
+      - 'Combat Evolved.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Requiem.esp'
+      - 'Stealth Skills Rebalanced_COMPLETE.esp'
+      - 'Thief skills rebalance for Ordinator.esp'
+  - name: 'Relationship Dialogue Overhaul.esp'
+    after:
+      - '018Auri.esp'
+  - name: 'Serana Dialogue Edit.esp'
+    after:
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'SkyTEST-RealisticAnimals&Predators.esp'
+    after:
+      - 'Mortal Enemies.esp'
+  - name: 'TavernAIFix.esp'
+    after:
+      - 'GoToBed.esp'
+      - 'Immersive Encounters.esp'
+  - name: 'Wild World.esp'
+    after:
+      - 'Combat Evolved.esp'
+      - 'MVABasic.esp'
+  - name: 'AlternatePerspective.esp'
+    group: 'Alternate Start'
+  - name: 'alternate start - live another life.esp'
+    group: 'Alternate Start'
+    after:
+      - 'Ambriel.esp'
+      - 'BecomeKingofSkyrim.esp'
+      - 'BetterQuestObjectives.esp'
+      - 'Guard Dialogue Overhaul.esp'
+  - name: 'At Your Own Pace - Thieves Guild.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+      - 'BetterQuestObjectives - YASH Patch.esp'
+      - 'More Dialogue Options.esp'
+      - 'Requiem.esp'
+  - name: 'BetterQuestObjectives-AlternateStartPatch.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'Bittercup - Tweaks and Enhancements.esp'
+    after:
+      - 'Unofficial Bittercup Patch.esl'
+  - name: 'BOTI.esp'
+    after:
+      - 'Quest Conflict Fixes.esp'
+  - name: 'Civil War Defense for OCW.esp'
+    after:
+      - 'Jarl Balgruuf Dilemma Extended.esp'
+      - 'Neutral Civil War Forts Respawn.esp'
+      - 'Serious Civil War Finale Sieges.esp'
+  - name: 'CollegeEntry.esp'
+    after:
+      - 'waccf_armor and clothing extension.esp'
+  - name: 'College Of Winterhold - Quest Expansion.esp'
+    after:
+      - 'CoW Entry Requirements.esp'
+  - name: 'CYA_ChooseYourOwnArchMage.esp'
+    after:
+      - 'CollegeEntry.esp'
+  - name: 'Dawnguard - (Tweaks and Enhancements|Radiant Quest Requirements)\.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'Finding_Derkeethus.esp'
+    after:
+      - 'Quest Markers Restored.esp'
+  - name: 'Finding_Helgi_and_Laelette.esp'
+    after:
+      - name: 'BetterQuestObjectives.esp'
+        condition: 'not is_master("Finding_Helgi_and_Laelette.esp")'
+      - name: 'Landscape Fixes For Grass Mods.esp'
+        condition: 'not is_master("Finding_Helgi_and_Laelette.esp")'
+      - name: 'Road to Morthal.esp'
+        condition: 'not is_master("Finding_Helgi_and_Laelette.esp")'
+      - name: 'TheChoiceIsYours.esp'
+        condition: 'not is_master("Finding_Helgi_and_Laelette.esp")'
+  - name: 'WARP_FindingHaL_Patch.esp'
+    after:
+      - 'WARP - EBQO Patch.esp'
+      - 'WARP - TheChoiceIsYours Patch.esp'
+  - name: 'Finding_VelehkSain.*\.esp'
+    after:
+      - 'ApepiBetterCollege.esp'
+      - 'CollegeOfWinterholdImmersive.esp'
+      - 'Immersive Weapons.esp'
+      - 'MagicalCollegeofWinterhold.esp'
+      - 'Weapons Armor Clothing & Clutter Fixes.esp'
+  - name: 'Finding_VelehkSain.esp'
+    after:
+      - 'MCWT_ErratumEtc.esp'
+      - 'MCWT_ErratumEtc_Lite.esp'
+      - 'MCWT_TheAugursAdmonishment.esp'
+      - name: 'OCW_Obscure''s_CollegeofWinterhold.esp'
+        condition: 'not version("Finding_VelehkSain.esp", >=, "1.0.8") and (not checksum("Finding_VelehkSain.esp", 63CC1662) and not checksum("Finding_VelehkSain.esp", 596355B3))'
+  - name: 'Finding_VelehkSain_MAQF.esp'
+    after:
+      - name: 'OCW_Obscure''s_CollegeofWinterhold.esp'
+        condition: 'not version("Finding_VelehkSain_MAQF.esp", >=, "1.0.8") and (not checksum("Finding_VelehkSain_MAQF.esp", 622EFFB6) and not checksum("Finding_VelehkSain_MAQF.esp", 4714F2F9) and not checksum("Finding_VelehkSain_MAQF.esp", 4BBC811C))'
+  - name: 'InnoLostAlt.esp'
+    after:
+      - 'TheChoiceIsYours.esp'
+  - name: 'LovelyLetter.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+      - 'Relationship Dialogue Overhaul.esp'
+      - 'TheChoiceIsYours.esp'
+  - name: 'Missing Apprentices CRF Quest Fix.esp'
+    after:
+      - 'BetterQuestObjectives-CRFPatch.esp'
+      - 'Book Covers Skyrim.esp'
+  - name: 'notice board - better solstheim quests.esp'
+    after:
+      - 'alternate start - live another life.esp'
+      - 'Immersive Wenches.esp'
+  - name: 'NotSoFast-MageGuild.esp'
+    after:
+      - 'CollegeEntry.esp'
+      - 'CollegeOfWinterholdImmersive.esp'
+  - name: 'NotSoFast-MainQuest.esp'
+    after:
+      - 'MLU.esp'
+  - name: 'Paradigm - (A Quick Start Overhaul|Simonrim Edition)\.esp'
+    group: 'Alternate Start'
+  - name: 'PathOfMight.esp'
+    after:
+      - 'Ordinator - Perks of Skyrim.esp'
+      - 'Vokrii - Minimalistic Perks of Skyrim.esp'
+  - name: 'QuestsAreInSkyrim(USSEP)?\.esp'
+    group: 'Early Loaders'
+  - name: 'SaveTheIcerunner.esp'
+    after:
+      - 'TheChoiceIsYours.esp'
+  - name: 'Skyrim Unbound.esp'
+    group: 'Alternate Start'
+  - name: 'Skyrim Unlocked.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'tcbm.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+      - 'Ordinator - Perks of Skyrim.esp'
+      - 'point the way.esp'
+  - name: 'Thane of Whiterun Requires Favors.esp'
+    after:
+      - 'Thane of Riften Requires Favors.esp'
+  - name: 'The Brotherhood of Old.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("Immersive Citizens - AI Overhaul.esp") and is_master("The Brotherhood of Old.esp")) or (not is_master("Immersive Citizens - AI Overhaul.esp") and not is_master("The Brotherhood of Old.esp"))'
+      - name: 'SkyrimSewers.esp'
+        condition: '(is_master("SkyrimSewers.esp") and is_master("The Brotherhood of Old.esp")) or (not is_master("SkyrimSewers.esp") and not is_master("The Brotherhood of Old.esp"))'
+  - name: 'TheChoiceIsYours.esp'
+    after:
+      - 'BA_Sorting.esp'
+      - 'BA_Sorting_BCS.esp'
+      - 'BetterQuestObjectives.esp'
+      - 'BetterQuestObjectives - BCS Patch.esp'
+      - 'BetterQuestObjectives-BSaQBPatch.esp'
+      - 'BetterQuestObjectives - LOTD Patch.esp'
+      - 'Better Skill and Quest Books Names SE.esp'
+      - 'Book Covers Skyrim.esp'
+      - 'cutting room floor.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Relationship Dialogue Overhaul.esp'
+      - name: 'Wintersun - Faiths of Skyrim.esp'
+        condition: 'not file("TCIY_Wintersun_Patch.esp")'
+  - name: 'Thieves Guild Requirements.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'TimingIsEverything.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+  - name: 'Tools of Kagrenac.esp'
+    after:
+      - name: 'MLU.esp'
+        condition: '(is_master("MLU.esp") and is_master("Tools of Kagrenac.esp")) or (not is_master("MLU.esp") and not is_master("Tools of Kagrenac.esp"))'
+      - name: 'ZIA_Ancient Pack.esp'
+        condition: '(is_master("ZIA_Ancient Pack.esp") and is_master("Tools of Kagrenac.esp")) or (not is_master("ZIA_Ancient Pack.esp") and not is_master("Tools of Kagrenac.esp"))'
+      - name: 'ZIA_Complete Pack.esp'
+        condition: '(is_master("ZIA_Complete Pack.esp") and is_master("Tools of Kagrenac.esp")) or (not is_master("ZIA_Complete Pack.esp") and not is_master("Tools of Kagrenac.esp"))'
+      - name: 'ZKN.esp'
+        condition: '(is_master("ZKN.esp") and is_master("Tools of Kagrenac.esp")) or (not is_master("ZKN.esp") and not is_master("Tools of Kagrenac.esp"))'
+  - name: 'ww_AlternateDBEnding.esp'
+    after:
+      - 'BetterQuestObjectives.esp'
+      - 'BetterQuestObjectives-DBForevertoMisc.esp'
+      - 'Save the Dark Brotherhood!.esp'
+      - 'SaveTheBrotherhood.esp'
+      - 'The Brotherhood of Old.esp'
+  - name: 'Adamant.esp'
+    after:
+      - name: 'SPERG-SSE.esp'
+        condition: 'file("Vokriinator( Black)?\.esp")'
+  - name: 'Growl - Werebeasts of Skyrim.esp'
+    after:
+      - 'MLU.esp'
+      - 'Mortal Enemies.esp'
+      - 'Mortal Enemies - No RunWalk Changes.esp'
+      - 'Mortal Enemies - Rival Remix.esp'
+      - 'Mortal Enemies - Rival Remix - NoRunWalkChanges.esp'
+      - 'Mortal Enemies - 2.0 Test Version.esp'
+      - 'Tainted_Blood.esp'
+  - name: 'Lock_Overhaul.esp'
+    after:
+      - 'Ordinator - Perks of Skyrim.esp'
+  - name: 'Ordinator - Perks of Skyrim.esp'
+    group: 'Skills & Perks'
+    after:
+      - name: 'PathOfSorcery.esp'
+        condition: 'file("Path to Ordinance.esp") or file("Vokriinator( Black)?\.esp")'
+      - 'Phenderix Magic Evolved.esp'
+      - 'Phenderix Magic World.esp'
+      - 'SAFO.esp'
+      - 'Undeath.esp'
+      - name: 'Vokrii - Minimalistic Perks of Skyrim.esp'
+        condition: 'file("Vokriinator( Black)?\.esp")'
+      - 'Weapons Armor Clothing & Clutter Fixes.esp'
+  - name: 'PathOfSorcery.esp'
+    group: 'Skills & Perks'
+    after:
+      - 'Adamant.esp'
+      - name: 'Ordinator - Perks of Skyrim.esp'
+        condition: 'not file("Path to Ordinance.esp") and not file("Vokriinator( Black)?\.esp")'
+      - 'SPERG-SSE.esp'
+      - name: 'Vokrii - Minimalistic Perks of Skyrim.esp'
+        condition: 'not file("Vokriinator( Black)?\.esp")'
+  - name: 'Perks of Valhala - Block Only.esp'
+    group: 'Skills & Perks'
+  - name: 'Sacrilege - Minimalistic Vampires of Skyrim.esp'
+    group: 'Vampire Gameplay Overhauls'
+  - name: 'Sacrosanct - Vampires of Skyrim.esp'
+    group: 'Vampire Gameplay Overhauls'
+    after:
+      - 'RaceCompatibilityUSKPOverride.esp'
+  - name: 'Smithing Perks Overhaul SE.esp'
+    after:
+      - 'Complete Crafting Overhaul_Remastered.esp'
+  - name: 'SPERG-SSE.esp'
+    after:
+      - name: 'MysticismMagic.esp'
+        condition: 'file("Vokriinator( Black)?\.esp")'
+  - name: 'Vampiric Thirst Redone.esp'
+    group: 'Vampire Gameplay Overhauls'
+  - name: 'mslVampiricThirst.esp'
+    group: 'Vampire Gameplay Overhauls'
+  - name: 'Vokrii - Minimalistic Perks of Skyrim.esp'
+    group: 'Skills & Perks'
+    after:
+      - name: 'Ordinator - Perks of Skyrim.esp'
+        condition: 'file("Vokrus - Vokrii Expanded.esp")'
+      - name: 'PathOfSorcery.esp'
+        condition: 'file("Vokriinator( Black)?\.esp")'
+  - name: 'Vokriinator( Black)?\.esp'
+    group: 'Skills & Perks'
+  - name: 'WerewolfPerksExpanded.esp'
+    after:
+      - 'Requiem.esp'
+  - name: 'TESL-LS-VanillaLSRemover.esp'
+    group: 'Late Loaders'
+  - name: 'Atlas Legendary( OCS)?\.esp'
+    after:
+      - 'Complete Alchemy & Cooking Overhaul.esp'
+      - 'MLU.esp'
+  - name: 'Atlas Legendary.esp'
+    group: 'Map Markers'
+  - name: 'atlas map markers.esp'
+    group: 'Map Markers'
+  - name: 'dawnguard map markers.esp'
+    group: 'Map Markers'
+  - name: 'A Clear Map of Skyrim.esp'
+    group: 'Paper Maps'
+  - name: 'City Paper Maps for FWMF.esp'
+    group: 'Paper Maps'
+  - name: 'EzEWorldMapSE.esp'
+    group: 'Worldspace Settings'
+  - name: 'FWMF ( {0}|for Fantasy Paper Maps {0}|Geology Survey Map {0}|Marked Clean Map {0}|Marked Old Map {0}|Skyrim and Solstheim Satellite Maps {0}|Unmarked Clean Map {0}|Unmarked Old Map {0}|)\.esp'
+    group: 'Paper Maps'
+  - name: 'Lux patch for FWMF.esp'
+    after:
+      - 'FWMF for Fantasy Paper Maps.esp'
+      - 'FWMF for Paper Map by Mirhayasu.esp'
+      - 'FWMF Geology Survey Map.esp'
+      - 'FWMF Marked Clean Map.esp'
+      - 'FWMF Marked Old Map.esp'
+      - 'FWMF SE Marked Clean Map 4K.esp'
+      - 'FWMF SE Marked Old Map 4K.esp'
+      - 'FWMF SE Unmarked Clean Map 4K.esp'
+      - 'FWMF SE Unmarked Old Map 4K.esp'
+      - 'FWMF Skyrim and Solstheim Satellite Maps.esp'
+      - 'FWMF Unmarked Clean Map.esp'
+      - 'FWMF Unmarked Old Map.esp'
+  - name: 'RW2 - Patch - FWMF for Fantasy Paper Maps.esp'
+    after:
+      - 'FWMF for Fantasy Paper Maps.esp'
+  - name: 'RW2 - Patch - FWMF Satellite Maps.esp'
+    after:
+      - 'FWMF Skyrim and Solstheim Satellite Maps.esp'
+  - name: 'RW2 - Patch - Geology Survey Map.esp'
+    after:
+      - 'FWMF Geology Survey Map.esp'
+  - name: 'RW2 - Patch - Marked Clean Map.esp'
+    after:
+      - 'FWMF Marked Clean Map.esp'
+  - name: 'RW2 - Patch - Marked Old Map.esp'
+    after:
+      - 'FWMF Marked Old Map.esp'
+  - name: 'RW2 - Patch - Unmarked Clean Map.esp'
+    after:
+      - 'FWMF Unmarked Clean Map.esp'
+  - name: 'RW2 - Patch - Unmarked Old Map.esp'
+    after:
+      - 'FWMF Unmarked Old Map.es'
+  - name: 'Water for ENB - Patch - FWMF for Fantasy Paper Maps.esp'
+    after:
+      - 'FWMF for Fantasy Paper Maps.esp'
+  - name: 'Water for ENB - Patch - FWMF for Satellite Maps.esp'
+    after:
+      - 'FWMF Skyrim and Solstheim Satellite Maps.esp'
+  - name: 'Water for ENB - Patch - FWMF Geology Survey.esp'
+    after:
+      - 'FWMF Geology Survey Map.esp'
+  - name: 'Water for ENB - Patch - FWMF Marked Clean.esp'
+    after:
+      - 'FWMF Marked Clean Map.esp'
+  - name: 'Water for ENB - Patch - FWMF Marked Clean Map 4K.esp'
+    after:
+      - 'FWMF SE Marked Clean Map 4K.esp'
+  - name: 'Water for ENB - Patch - FWMF Marked Old.esp'
+    after:
+      - 'FWMF Marked Old Map.esp'
+  - name: 'Water for ENB - Patch - FWMF Marked Old Map 4K.esp'
+    after:
+      - 'FWMF SE Marked Old Map 4K.esp'
+  - name: 'Water for ENB - Patch - FWMF Paper Map by Mirhayasu.esp'
+    after:
+      - 'FWMF for Paper Map by Mirhayasu.esp'
+  - name: 'Water for ENB - Patch - FWMF Unmarked Clean.esp'
+    after:
+      - 'FWMF Unmarked Clean Map.esp'
+  - name: 'Water for ENB - Patch - FWMF Unmarked Clean Map 4K.esp'
+    after:
+      - 'FWMF SE Unmarked Clean Map 4K.esp'
+  - name: 'Water for ENB - Patch - FWMF Unmarked Old.esp'
+    after:
+      - 'FWMF Unmarked Old Map.esp'
+  - name: 'Water for ENB - Patch - FWMF Unmarked Old Map 4K.esp'
+    after:
+      - 'FWMF SE Unmarked Old Map 4K.esp'
+  - name: 'FWMF ( {0}|for Paper Map by Mirhayasu {0}|SE Marked Clean Map 4K {0}|SE Marked Old Map 4K {0}|SE Unmarked Clean Map 4K {0}|SE Unmarked Old Map 4K {0}|Skygerfall {0}|)\.esp'
+    group: 'Paper Maps'
+  - name: '(Apocrypha|Blackreach|Dayspring Canyon|Deepwood Vale|Forgotten Vale|Markarth|Skuldafn|Skyrim|Solstheim|Soul Cairn|Sovngarde)( Paper)? Map( by (FreelanceCartography|Geevee))? for FWMF( by Limon)?\.esp'
+    group: 'Paper Maps'
+    after:
+      - 'FWMF for Fantasy Paper Maps.esp'
+      - 'FWMF for Paper Map by Mirhayasu.esp'
+      - 'FWMF Geology Survey Map.esp'
+      - 'FWMF Marked Clean Map.esp'
+      - 'FWMF Marked Old Map.esp'
+      - 'FWMF SE Marked Clean Map 4K.esp'
+      - 'FWMF SE Marked Old Map 4K.esp'
+      - 'FWMF SE Unmarked Clean Map 4K.esp'
+      - 'FWMF SE Unmarked Old Map 4K.esp'
+      - 'FWMF Skyrim and Solstheim Satellite Maps.esp'
+      - 'FWMF Unmarked Clean Map.esp'
+      - 'FWMF Unmarked Old Map.esp'
+  - name: '(FWMF_(Akavir|Darkend)|(Beyond Bruma|Darkend|ECSS Shivering Isles|Falskaar|GCoN|Midwood Isle|Sea of Causality|Solstheim|Vigilant|Wyrmstooth)( Paper)?( Map)?( by (Duncan|Mirhayasu))? for FWMF( by Limon)?)\.esp'
+    group: 'Paper Maps'
+    after:
+      - 'FWMF for Fantasy Paper Maps.esp'
+      - 'FWMF for Paper Map by Mirhayasu.esp'
+      - 'FWMF Geology Survey Map.esp'
+      - 'FWMF Marked Clean Map.esp'
+      - 'FWMF Marked Old Map.esp'
+      - 'FWMF SE Marked Clean Map 4K.esp'
+      - 'FWMF SE Marked Old Map 4K.esp'
+      - 'FWMF SE Unmarked Clean Map 4K.esp'
+      - 'FWMF SE Unmarked Old Map 4K.esp'
+      - 'FWMF Skyrim and Solstheim Satellite Maps.esp'
+      - 'FWMF Unmarked Clean Map.esp'
+      - 'FWMF Unmarked Old Map.esp'
+  - name: 'IcePenguinWorldMap(classic)?\.esp'
+    after:
+      - 'Cathedral Concept - Lightweight Grass Overhaul.esp'
+      - 'Cathedral Landscapes.esp'
+  - name: 'IcePenguinWorldMapPaper.esp'
+    group: 'Paper Maps'
+  - name: 'Paper World Map.esp'
+    group: 'Paper Maps'
+  - name: 'aMidianBorn_ContentAddon(Light)?\.esp'
+    after:
+      - 'aMidianBorn_Book of Silence.esp'
+      - 'BetterQuestObjectives.esp'
+      - '1nivWICCloaks.esp'
+      - '1nivWICCloaksNoGuards.esp'
+      - 'WarmongerArmory_LeveledList.esp'
+  - name: 'waccf_armor and clothing extension.esp'
+    after:
+      - 'AmuletsShowOnEverything.esp'
+      - 'AmuletsShowOnClothes.esp'
+      - 'AmuletsShowOnHeavyArmor.esp'
+      - 'AmuletsShowOnLightArmor.esp'
+      - 'AmuletsShowOnRobes.esp'
+      - 'AmuletsShowOnEverything-JOP.esp'
+      - 'AmuletsShowOnClothes-JOP.esp'
+      - 'AmuletsShowOnHeavyArmor-JOP.esp'
+      - 'AmuletsShowOnLightArmor-JOP.esp'
+      - 'AmuletsShowOnRobes-JOP.esp'
+      - 'AnotherSortingMod_2017-SSE.esp'
+      - 'WACCF_ASM-2019.esp'
+      - 'weapons armor clothing & clutter fixes.esp'
+  - name: 'BandolierForNPC - Realistic Enchantements.esp'
+    after:
+      - 'BandolierForNPC.esp'
+  - name: 'Book Covers Skyrim.esp'
+    after:
+      - 'Tel_Nalta.esp'
+      - 'UnlimitedBookshelves.esp'
+      - 'Weightless Books.esp'
+      - 'WeightlessOV - Book.esp'
+  - name: 'Circlets and Masks with all Robes and Hoods.esp'
+    group: 'Fixes'
+  - name: 'ClavicusArgonianMasque.esp'
+    after:
+      - 'MLU.esp'
+      - 'Weapons Armor Clothing & Clutter Fixes.esp'
+  - name: 'HFDecorativeDolls.esp'
+    group: 'New Content'
+  - name: 'Hothtrooper44_ArmorCompilation.esp'
+    after:
+      - 'Ambriel.esp'
+  - name: 'IARR, DBM Integration.esp'
+    after:
+      - 'IARR, CCOR Patch.esp'
+  - name: 'IARR, Levelled List Integration.esp'
+    group: 'Leveled List Modifiers'
+  - name: 'IARR, OWL Patch.esp'
+    group: 'Leveled List Modifiers'
+  - name: 'Immersive Jewelry.esp'
+    after:
+      - 'Complete Crafting Overhaul_Remastered.esp'
+  - name: 'Immersive Weapons.esp'
+    after:
+      - 'AmazingFollowerTweaks.esp'
+  - name: 'imp_helm_legend.esp'
+    after:
+      - 'Circlets and Masks with all Robes and Hoods.esp'
+  - name: 'Lore Weapon Expansion.esp'
+    after:
+      - 'Audio Overhaul Skyrim.esp'
+      - 'DLCIntegration.esp'
+      - 'Weapons Armor Clothing & Clutter Fixes.esp'
+  - name: 'Lore Weapon Expansion - (Daedric Crescent|Goldbrand|Relics of the Crusader)\.esp'
+    group: 'New Content'
+  - name: 'skyshards.esp'
+    after:
+      - 'Landscape For Grass Mods - Moon and Star PATCH.esp'
+  - name: 'Summermyst - Enchantments of Skyrim.esp'
+    after:
+      - 'Weapon AF.esp'
+      - 'Weapons & Armor Fixes_Remade.esp'
+  - name: 'WarmongerArmory_LeveledList.esp'
+    after:
+      - '1nivWICCloaks.esp'
+      - '1nivWICCloaksNoGuards.esp'
+  - name: 'ZIA_(Ancient|Complete|Daedric) Pack\.esp'
+    after:
+      - 'MLU.esp'
+  - name: 'Z(AB|AS|AU|BB|BW|CH|CV|DB|EB|EM|GA|KN|KT|MB|MR|MS|NA|NB|NI|OI|RA|RH|RN|SB|SC|SH|SK|SM|SR|SY|TH|VD|WJ|WT)\.esp'
+    after:
+      - 'MLU.esp'
+  - name: 'dv01vampireclanwar.esm'
+    after:
+      - 'erblackreachexpanded.esm'
+  - name: 'MoonAndStar_MAS.esp'
+    after:
+      - name: 'AuroraVillage.esp'
+        condition: 'not is_master("MoonAndStar_MAS.esp")'
+      - name: 'Landscape Fixes For Grass Mods.esp'
+        condition: 'not is_master("MoonAndStar_MAS.esp")'
+      - name: 'Tel_Nalta.esp'
+        condition: 'not is_master("MoonAndStar_MAS.esp")'
+  - name: 'Moonpath (Music - )?Sky and Light(n)?ing Fix( - merged)?.esp'
+    after:
+      - 'JRMoonpathBrumaPatch.esp'
+  - name: 'Undeath.esp'
+    after:
+      - name: 'MoonAndStar_MAS.esp'
+        condition: 'not is_master("Undeath.esp")'
+  - name: 'AHZBetterDGEntranceSE.esp'
+    after:
+      - name: 'Immersive Patrols II.esp'
+        condition: 'not is_master("AHZBetterDGEntranceSE.esp")'
+  - name: 'AHZBetterDGEntranceSE - BSHeartland Patch.esp'
+    after:
+      - 'AHZBetterDGEntranceSE.esp'
+  - name: 'BattleAftermath.esp'
+    after:
+      - 'Immersive War and Violence.esp'
+  - name: 'bee hives.esp'
+    group: 'New Content'
+  - name: 'Convenient Carriages.esp'
+    after:
+      - 'Clockwork.esp'
+      - 'COTN - Dawnstar.esp'
+      - 'Enhanced Solitude SSE.esp'
+      - 'JKs Skyrim.esp'
+      - 'MoreToSay.esp'
+      - 'moretosayfalkreath.esp'
+      - 'Solitude Docks.esp'
+      - 'tpos_complete02_RTCWG.esp'
+      - 'Windhelm Bridge Overhaul.esp'
+  - name: 'CFTO.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'cutting room floor.esp'
+    after:
+      - name: 'TouringCarriages.esp'
+        condition: '(is_master("cutting room floor.esp") and is_master("TouringCarriages.esp")) or (not is_master("cutting room floor.esp") and not is_master("TouringCarriages.esp"))'
+  - name: 'Laundry.esp'
+    group: 'New Content'
+  - name: 'provincial courier service.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("Immersive Citizens - AI Overhaul.esp") and is_master("provincial courier service.esp")) or (not is_master("Immersive Citizens - AI Overhaul.esp") and not is_master("provincial courier service.esp"))'
+      - name: 'manny Lantern Caretakers.esp'
+        condition: '(is_master("manny Lantern Caretakers.esp") and is_master("provincial courier service.esp")) or (not is_master("manny Lantern Caretakers.esp") and not is_master("provincial courier service.esp"))'
+  - name: 's6o6t Lore - Oblivion Gates.esp'
+    group: 'New Content'
+  - name: 'Settlements Expanded SE.esp'
+    after:
+      - name: 'soljund''s sinkhole.esp'
+        condition: '(is_master("soljund''s sinkhole.esp") and is_master("Settlements Expanded SE.esp")) or (not is_master("soljund''s sinkhole.esp") and not is_master("Settlements Expanded SE.esp"))'
+      - name: 'whistling mine.esp'
+        condition: '(is_master("whistling mine.esp") and is_master("Settlements Expanded SE.esp")) or (not is_master("whistling mine.esp") and not is_master("Settlements Expanded SE.esp"))'
+  - name: 'simpleCarriageExpansion.esp'
+    group: 'New Content'
+  - name: 'Solitude Skyway SE.esp'
+    after:
+      - name: 'KvHarborside.esp'
+        condition: 'file("KvHarborside [PATCH - SSkwy.TGCoS].esp")'
+  - name: 'AnotherOakwood.esp'
+    after:
+      - 'ogFalkreathHauntings.esp'
+  - name: 'BluePalaceTerrace.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("BluePalaceTerrace.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("BluePalaceTerrace.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'Solitude Expansion.esp'
+        condition: '(is_master("BluePalaceTerrace.esp") and is_master("Solitude Expansion.esp")) or (not is_master("BluePalaceTerrace.esp") and not is_master("Solitude Expansion.esp"))'
+  - name: 'CollegeOfWinterholdImmersive.esp'
+    after:
+      - name: 'Book Covers Skyrim.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("Book Covers Skyrim.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("Book Covers Skyrim.esp"))'
+      - name: 'CollegeEntry.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("CollegeEntry.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("CollegeEntry.esp"))'
+      - name: 'College Of Winterhold - Quest Expansion.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("College Of Winterhold - Quest Expansion.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("College Of Winterhold - Quest Expansion.esp"))'
+      - name: 'cutting room floor.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("cutting room floor.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("cutting room floor.esp"))'
+      - name: 'Enlightened College of Winterhold.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("Enlightened College of Winterhold.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("Enlightened College of Winterhold.esp"))'
+      - name: 'HFDecorativeDolls.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("HFDecorativeDolls.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("HFDecorativeDolls.esp"))'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'Immersive Wenches.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("Immersive Wenches.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("Immersive Wenches.esp"))'
+      - name: 'MCWT_ScheduledSavos.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("MCWT_ScheduledSavos.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("MCWT_ScheduledSavos.esp"))'
+      - name: 'MLU.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("MLU.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("MLU.esp"))'
+      - name: 'TheWulfPanda - Faction Teleport Spells.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("TheWulfPanda - Faction Teleport Spells.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("TheWulfPanda - Faction Teleport Spells.esp"))'
+      - name: 'TheWulfPanda - Faction Teleport Spells Less Magicka Increased Cast Time.esp'
+        condition: '(is_master("CollegeOfWinterholdImmersive.esp") and is_master("TheWulfPanda - Faction Teleport Spells Less Magicka Increased Cast Time.esp")) or (not is_master("CollegeOfWinterholdImmersive.esp") and not is_master("TheWulfPanda - Faction Teleport Spells Less Magicka Increased Cast Time.esp"))'
+  - name: 'COTN - Dawnstar.esp'
+    after:
+      - name: 'JKs Skyrim.esp'
+        condition: 'active("The Great Cities of JK''s North - Patch.esp") and ((is_master("COTN - Dawnstar.esp") and is_master("JKs Skyrim.esp")) or (not is_master("COTN - Dawnstar.esp") and not is_master("JKs Skyrim.esp")))'
+      - name: 'Landscape Fixes For Grass Mods.esp'
+        condition: 'not is_master("COTN - Dawnstar.esp")'
+      - name: 'Landscape For Grass Mods JK''S Skyrim.esp'
+        condition: 'not is_master("COTN - Dawnstar.esp")'
+      - name: 'MoreToSay.esp'
+        condition: 'not is_master("COTN - Dawnstar.esp")'
+      - name: 'moretosaycityguards.esp'
+        condition: 'not is_master("COTN - Dawnstar.esp") and not active("COTN Dawnstar - More to Say City Guards.esp")'
+  - name: 'COTN - Falkreath.esp'
+    after:
+      - name: 'JKs Skyrim.esp'
+        condition: 'active("The Great Cities of JK''s North - Patch.esp") and ((is_master("COTN - Falkreath.esp") and is_master("JKs Skyrim.esp")) or (not is_master("COTN - Falkreath.esp") and not is_master("JKs Skyrim.esp")))'
+  - name: 'COTN - Morthal.esp'
+    after:
+      - name: 'JKs Skyrim.esp'
+        condition: 'active("The Great Cities of JK''s North - Patch.esp") and ((is_master("COTN - Morthal.esp") and is_master("JKs Skyrim.esp")) or (not is_master("COTN - Morthal.esp") and not is_master("JKs Skyrim.esp")))'
+      - name: 'Landscape For Grass Mods JK''S Skyrim.esp'
+        condition: 'not is_master("COTN - Morthal.esp")'
+  - name: 'COTN - Winterhold.esp'
+    after:
+      - name: 'JKs Skyrim.esp'
+        condition: 'active("The Great Cities of JK''s North - Patch.esp") and ((is_master("COTN - Winterhold.esp") and is_master("JKs Skyrim.esp")) or (not is_master("COTN - Winterhold.esp") and not is_master("JKs Skyrim.esp")))'
+  - name: 'CoW Bridge Fix.esp'
+    group: 'Fixes'
+  - name: 'darkwater crossing.esp'
+    after:
+      - name: 'Finding_Derkeethus.esp'
+        condition: '(is_master("Finding_Derkeethus.esp") and is_master("darkwater crossing.esp")) or (not is_master("Finding_Derkeethus.esp") and not is_master("darkwater crossing.esp"))'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("Immersive Citizens - AI Overhaul.esp") and is_master("darkwater crossing.esp")) or (not is_master("Immersive Citizens - AI Overhaul.esp") and not is_master("darkwater crossing.esp"))'
+  - name: 'dawnstar.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("dawnstar.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("dawnstar.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+  - name: 'Distinct Interiors.esp'
+    after:
+      - 'ELFX - NoBreezehome.esp'
+      - 'ELFX - NoHoneyside.esp'
+      - 'ELFX - NoPlayerHomes.esp'
+      - 'ELFX - NoProudspireManor.esp'
+      - 'ELFX - NoVlindrelHall.esp'
+      - 'EnhancedLightsandFX.esp'
+      - 'Snazzy Furniture and Clutter Overhaul.esp'
+  - name: 'DungeonsRevisited.esp'
+    after:
+      - 'ELFXEnhancer.esp'
+      - 'ELFX - Hardcore.esp'
+  - name: 'Enhanced Solitude Docks.esp'
+    after:
+      - 'Enhanced Solitude SSE.esp'
+  - name: 'Enlightened College of Winterhold.esp'
+    group: 'Early Loaders'
+  - name: 'ETaC - RESOURCES.esm'
+    group: 'Fixes'
+  - name: 'ETaC - Complete.esp'
+    after:
+      - name: '3DNPC.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("3DNPC.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("3DNPC.esp"))'
+      - name: 'AncientLand2.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("AncientLand2.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("AncientLand2.esp"))'
+      - name: 'BetterDocks-MP-DLC-Compatible.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("BetterDocks-MP-DLC-Compatible.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("BetterDocks-MP-DLC-Compatible.esp"))'
+      - name: 'CLARALUX SSE.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("CLARALUX SSE.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("CLARALUX SSE.esp"))'
+      - name: 'cutting room floor.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("cutting room floor.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("cutting room floor.esp"))'
+      - name: 'Finding_Derkeethus.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Finding_Derkeethus.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Finding_Derkeethus.esp"))'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'Landscape Fixes For Grass Mods.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Landscape Fixes For Grass Mods.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Landscape Fixes For Grass Mods.esp"))'
+      - name: 'LeafRest OnePiece.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("LeafRest OnePiece.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("LeafRest OnePiece.esp"))'
+      - name: 'Populated Cities Towns Villages Legendary.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Populated Cities Towns Villages Legendary.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Populated Cities Towns Villages Legendary.esp"))'
+      - name: 'RiverwoodHuntingCabinSE.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("RiverwoodHuntingCabinSE.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("RiverwoodHuntingCabinSE.esp"))'
+      - name: 'RLO - Exteriors.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("RLO - Exteriors.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("RLO - Exteriors.esp"))'
+      - name: 'Rorikstead Wagons.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Rorikstead Wagons.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Rorikstead Wagons.esp"))'
+      - name: 'S3DLandscapes NextGenerationForests.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("S3DLandscapes NextGenerationForests.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("S3DLandscapes NextGenerationForests.esp"))'
+      - name: 'Skyrim Bridges.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Skyrim Bridges.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Skyrim Bridges.esp"))'
+      - name: 'UniqueLocationsRiverwoodForest.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("UniqueLocationsRiverwoodForest.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("UniqueLocationsRiverwoodForest.esp"))'
+      - name: 'Verdant - A Skyrim Grass Plugin SSE Version.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("Verdant - A Skyrim Grass Plugin SSE Version.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("Verdant - A Skyrim Grass Plugin SSE Version.esp"))'
+      - name: 'ViscousGrass.esp'
+        condition: '(is_master("ETaC - Complete.esp") and is_master("ViscousGrass.esp")) or (not is_master("ETaC - Complete.esp") and not is_master("ViscousGrass.esp"))'
+  - name: 'ETaC - Darkwater Crossing.esp'
+    after:
+      - name: 'Finding_Derkeethus.esp'
+        condition: '(is_master("ETaC - Darkwater Crossing.esp") and is_master("Finding_Derkeethus.esp")) or (not is_master("ETaC - Darkwater Crossing.esp") and not is_master("Finding_Derkeethus.esp"))'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Darkwater Crossing.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Darkwater Crossing.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'Skyrim Bridges.esp'
+        condition: '(is_master("ETaC - Darkwater Crossing.esp") and is_master("Skyrim Bridges.esp")) or (not is_master("ETaC - Darkwater Crossing.esp") and not is_master("Skyrim Bridges.esp"))'
+  - name: 'ETaC - Dawnstar.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Dawnstar.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Dawnstar.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'Populated Cities Towns Villages Legendary.esp'
+        condition: '(is_master("ETaC - Dawnstar.esp") and is_master("Populated Cities Towns Villages Legendary.esp")) or (not is_master("ETaC - Dawnstar.esp") and not is_master("Populated Cities Towns Villages Legendary.esp"))'
+  - name: 'ETaC - Kynesgrove.esp'
+    after:
+      - name: 'cutting room floor.esp'
+        condition: '(is_master("ETaC - Kynesgrove.esp") and is_master("cutting room floor.esp")) or (not is_master("ETaC - Kynesgrove.esp") and not is_master("cutting room floor.esp"))'
+  - name: 'ETaC - Morthal.esp'
+    after:
+      - name: 'AncientLand2.esp'
+        condition: '(is_master("ETaC - Morthal.esp") and is_master("AncientLand2.esp")) or (not is_master("ETaC - Morthal.esp") and not is_master("AncientLand2.esp"))'
+  - name: 'ETaC - Riverwood.esp'
+    after:
+      - name: 'AncientLand2.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("AncientLand2.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("AncientLand2.esp"))'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'LeafRest OnePiece.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("LeafRest OnePiece.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("LeafRest OnePiece.esp"))'
+      - name: 'Populated Cities Towns Villages Legendary.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("Populated Cities Towns Villages Legendary.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("Populated Cities Towns Villages Legendary.esp"))'
+      - name: 'RiverwoodHuntingCabinSE.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("RiverwoodHuntingCabinSE.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("RiverwoodHuntingCabinSE.esp"))'
+      - name: 'RLO - Exteriors.esp'
+        condition: '(is_master("ETaC - Riverwood.esp") and is_master("RLO - Exteriors.esp")) or (not is_master("ETaC - Riverwood.esp") and not is_master("RLO - Exteriors.esp"))'
+  - name: 'ETaC - Rorikstead.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("ETaC - Rorikstead.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("ETaC - Rorikstead.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+      - name: 'Rorikstead Wagons.esp'
+        condition: '(is_master("ETaC - Rorikstead.esp") and is_master("Rorikstead Wagons.esp")) or (not is_master("ETaC - Rorikstead.esp") and not is_master("Rorikstead Wagons.esp"))'
+  - name: 'falkreath.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("Immersive Citizens - AI Overhaul.esp") and is_master("falkreath.esp")) or (not is_master("Immersive Citizens - AI Overhaul.esp") and not is_master("falkreath.esp"))'
+      - name: 'moretosayfalkreath.esp'
+        condition: '(is_master("moretosayfalkreath.esp") and is_master("falkreath.esp")) or (not is_master("moretosayfalkreath.esp") and not is_master("falkreath.esp"))'
+  - name: 'fall of granite hill.esp'
+    after:
+      - name: 'HoldBorderBanners.esp'
+        condition: 'not is_master("fall of granite hill.esp")'
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("fall of granite hill.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("fall of granite hill.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+  - name: 'fortdawnguardimmersive.esp'
+    after:
+      - 'AHZBetterDGEntranceSE.esp'
+      - name: 'Blacksmith Forge Water Fix SE.esp'
+        condition: 'not active("Bashed Patch.*\.esp")'
+      - name: 'Blacksmith Forge Water Fix SE USSEP.esp'
+        condition: 'not active("Bashed Patch.*\.esp")'
+      - 'castle volkihar rebuilt.esp'
+      - 'EmbersHD.esp'
+      - 'Immersive Patrols II.esp'
+  - name: 'Fort(ified) Dawnguard.esp'
+    after:
+      - 'castle volkihar rebuilt.esp'
+  - name: 'Helgen Reborn.esp'
+    after:
+      - name: 'MLU.esp'
+        condition: '(is_master("Helgen Reborn.esp") and is_master("MLU.esp")) or (not is_master("Helgen Reborn.esp") and not is_master("MLU.esp"))'
+  - name: 'Holds.esp'
+    after:
+      - 'Landscape Fixes For Grass Mods.esp'
+  - name: 'Holds - Falkreath.esp'
+    after:
+      - 'Landscape Fixes For Grass Mods.esp'
+  - name: 'HS(DragonBridge|Markarth|PlayerHomes|Riften|Riverwood|Solitude|Whiterun|Wilderness|Windhelm) - .+\.esp'
+    after:
+      - 'EnhancedLightsandFX.esp'
+      - 'Flower Girls NPC Relationships.esp'
+      - 'Immersive Citizens - AI Overhaul.esp'
+      - 'Lux.esp'
+      - 'SexLab-AmorousAdventures.esp'
+  - name: 'JK''s Riverwood.esp'
+    after:
+      - 'S3DTrees NextGenerationForests.esp'
+      - 'Verdant - A Skyrim Grass Plugin SSE Version.esp'
+      - 'ViscousGrass.esp'
+  - name: 'JKs Skyrim.esp'
+    after:
+      - name: 'S3DTrees NextGenerationForests.esp'
+        condition: '(is_master("JKs Skyrim.esp") and is_master("S3DTrees NextGenerationForests.esp")) or (not is_master("JKs Skyrim.esp") and not is_master("S3DTrees NextGenerationForests.esp"))'
+      - name: 'The Great Cities - Minor Cities and Towns.esp'
+        condition: 'active("The Great Cities of JK''s North - Patch.esp") and ((is_master("JKs Skyrim.esp") and is_master("The Great Cities - Minor Cities and Towns.esp")) or (not is_master("JKs Skyrim.esp") and not is_master("The Great Cities - Minor Cities and Towns.esp")))'
+      - name: 'UniqueLocationsRiverwoodForest.esp'
+        condition: '(is_master("JKs Skyrim.esp") and is_master("UniqueLocationsRiverwoodForest.esp")) or (not is_master("JKs Skyrim.esp") and not is_master("UniqueLocationsRiverwoodForest.esp"))'
+      - name: 'Verdant - A Skyrim Grass Plugin SSE Version.esp'
+        condition: '(is_master("JKs Skyrim.esp") and is_master("Verdant - A Skyrim Grass Plugin SSE Version.esp")) or (not is_master("JKs Skyrim.esp") and not is_master("Verdant - A Skyrim Grass Plugin SSE Version.esp"))'
+      - name: 'ViscousGrass.esp'
+        condition: '(is_master("JKs Skyrim.esp") and is_master("ViscousGrass.esp")) or (not is_master("JKs Skyrim.esp") and not is_master("ViscousGrass.esp"))'
+  - name: 'JKs Skyrim - .+ patch\.esp'
+    after:
+      - 'JKs Skyrim - Rob''s Bug Fixes.esp'
+  - name: 'JK''s The Winking Skeever.esp'
+    after:
+      - 'Immersive Citizens - AI Overhaul.esp'
+  - name: 'JKs_The_Winking_Skeever_AlternateStartMods.esp'
+    after:
+      - 'alternate start - live another life.esp'
+  - name: 'JKs Whiterun.esp'
+    after:
+      - 'S3DTrees NextGenerationForests.esp'
+      - 'Verdant - A Skyrim Grass Plugin SSE Version.esp'
+      - 'ViscousGrass.esp'
+  - name: 'JKs Whiterun exterior.esp'
+    after:
+      - 'S3DTrees NextGenerationForests.esp'
+      - 'Verdant - A Skyrim Grass Plugin SSE Version.esp'
+      - 'ViscousGrass.esp'
+  - name: 'keld-nar.esp'
+    after:
+      - name: 'Clockwork.esp'
+        condition: 'not is_master("keld-nar.esp")'
+      - name: 'Complete Alchemy & Cooking Overhaul.esp'
+        condition: 'not is_master("keld-nar.esp")'
+      - name: 'Landscape Fixes For Grass Mods.esp'
+        condition: 'not is_master("keld-nar.esp")'
+      - name: 'Watchtowers of Skyrim.esp'
+        condition: 'not is_master("keld-nar.esp")'
+  - name: 'kinggathcreations_bard.esm'
+    group: 'New Content'
+  - name: 'kynesgrove.esp'
+    after:
+      - name: 'SkyrimReputation_SSE.esp'
+        condition: '(is_master("SkyrimReputation_SSE.esp") and is_master("kynesgrove.esp")) or (not is_master("SkyrimReputation_SSE.esp") and not is_master("kynesgrove.esp"))'
+  - name: 'MagicalCollegeofWinterhold.esp'
+    after:
+      - name: 'CollegeEntry.esp'
+        condition: 'not is_master("MagicalCollegeofWinterhold.esp")'
+  - name: 'MCoW_EndofLoadOrderOverwrite.esp'
+    after:
+      - name: 'CollegeEntry.esp'
+        condition: 'is_master("MagicalCollegeofWinterhold.esp")'
+  - name: 'Markarth Entrance Overhaul.esp'
+    after:
+      - 'Clockwork.esp'
+  - name: 'MCWT_FriendlyFaralda.esp'
+    after:
+      - 'More idle markers.esp'
+  - name: 'MCWT_GovernableGatekeeper.esp'
+    after:
+      - 'CollegeOfWinterholdImmersive.esp'
+  - name: 'MCWT_MageLightMaintenance.esp'
+    after:
+      - 'alternate start - live another life.esp'
+  - name: 'oakwood.esp'
+    after:
+      - name: 'storefront.esp'
+        condition: '(is_master("storefront.esp") and is_master("oakwood.esp")) or (not is_master("storefront.esp") and not is_master("oakwood.esp"))'
+      - name: 'TouringCarriages-Oakwood.esp'
+        condition: '(is_master("TouringCarriages-Oakwood.esp") and is_master("oakwood.esp")) or (not is_master("TouringCarriages-Oakwood.esp") and not is_master("oakwood.esp"))'
+  - name: 'OCW_CellSettings.esp'
+    group: 'High Priority Overrides'
+  - name: 'Palaces Castles Enhanced.esp'
+    group: 'Palaces Castles Enhanced'
+  - name: 'PCE - (3DNPC|ELFX|Holds|Holidays|Immersive Citizens|Relighting Skyrim|RDO|RLO|Skyrim Sewers|SPO).*\.esp'
+    after:
+      - 'PCE - USSEP Patch.esp'
+      - 'PCE - USSEP+CRF Patch.esp'
+  - name: 'PCE - Immersive Citizens AI Overhaul Patch.esp'
+    after:
+      - 'PCE - Skyrim Sewers Patch.esp'
+  - name: 'PCE - RLO Patch.esp'
+    after:
+      - 'PCE - 3DNPC Patch.esp'
+      - 'PCE - Art of Magicka Patch.esp'
+      - 'PCE - Holidays Patch.esp'
+      - 'PCE - Immersive Citizens AI Overhaul Patch.esp'
+      - 'PCE - Open Cities Patch.esp'
+      - 'PCE - Skyrim Sewers Patch.esp'
+      - 'PCE - SPO Patch.esp'
+  - name: 'RealisticRoomRental(-Basic)?\.esp'
+    after:
+      - 'EconomyOverhaulandSpeechcraftImprovements.esp'
+      - 'EconomyOverhaulandSpeechcraftImprovementsLite.esp'
+  - name: 'rorikstead.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("rorikstead.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("rorikstead.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+  - name: 'Solitude Expansion.esp'
+    after:
+      - 'Solitude Exterior Addon.esp'
+      - 'Tamriel Reloaded HD SE.esp'
+  - name: 'SR Exterior Cities.esp'
+    group: 'Open Cities Skyrim'
+  - name: 'SurWR.esp'
+    after:
+      - 'Landscape and Water Fixes - Patch - LFfGM.esp'
+  - name: 'The Great Cities - Minor Cities and Towns.esp'
+    after:
+      - name: 'JKs Skyrim.esp'
+        condition: 'active("The Great Cities of JK''s Skyrim - Patch.esp") and ((is_master("The Great Cities - Minor Cities and Towns.esp") and is_master("JKs Skyrim.esp")) or (not is_master("The Great Cities - Minor Cities and Towns.esp") and not is_master("JKs Skyrim.esp")))'
+  - name: 'The Great City of Dragon Bridge.esp'
+    after:
+      - name: 'dragon bridge.esp'
+        condition: 'active("TGCoDragon Bridge - Arthmoor DB Patch.esp") or active("The Great City of Dragon Bridge - JK''s + Arth''s Patch.esp")'
+  - name: 'The Great City of Rorikstead.esp'
+    after:
+      - name: 'rorikstead.esp'
+        condition: 'active("The Great City of Rorikstead - JK''s + Arth''s Patch.esp")'
+  - name: 'The Great City of Solitude.esp'
+    after:
+      - name: 'KvHarborside.esp'
+        condition: 'file("KvHarborside \[PATCH - (SSkwy\.)?TGCoS\]\.esp")'
+  - name: 'whistling mine.esp'
+    after:
+      - name: 'Immersive Citizens - AI Overhaul.esp'
+        condition: '(is_master("whistling mine.esp") and is_master("Immersive Citizens - AI Overhaul.esp")) or (not is_master("whistling mine.esp") and not is_master("Immersive Citizens - AI Overhaul.esp"))'
+  - name: 'WindhelmSSE.esp'
+    after:
+      - 'WindhelmEntranceOverhaul.esp'
+  - name: 'Winterhold College SSE.esp'
+    after:
+      - 'MCWT_ErratumEtc.esp'
+      - 'MCWT_ErratumEtc_Lite.esp'
+  - name: 'Winterhold Restored.esp'
+    group: 'Winterhold Restored'
+  - name: 'Winterhold Restored - COTN Winterhold Patch.esp'
+    after:
+      - 'Winterhold Restored - Expanded Farmhouses Patch.esp'
+      - 'Winterhold Restored - JKs Skyrim Patch.esp'
+      - 'Winterhold Restored - Windyridge Patch.esp'
+  - name: 'Winterhold Restored - Windyridge Patch.esp'
+    after:
+      - 'Winterhold Restored - JKs Skyrim Patch.esp'
+  - name: 'AK - Placeable Statics SE.esp'
+    group: 'Early Loaders'
+  - name: 'castle volkihar rebuilt.esp'
+    after:
+      - 'Relationship Dialogue Overhaul.esp'
+  - name: 'ceejsse001_hideouts.esl'
+    group: 'New Content'
+  - name: 'Dovahkiin_Retreat.esp'
+    after:
+      - 'Hideout_Main.esp'
+      - 'Hideout_HF_Main.esp'
+      - 'Hideout_DLC_Main.esp'
+      - 'Hideout_Compact.esp'
+      - 'Hideout_HF_Compact.esp'
+  - name: 'Dovahkiin_Retreat_Xmas.esp'
+    after:
+      - 'Hideout_Main.esp'
+      - 'Hideout_HF_Main.esp'
+      - 'Hideout_DLC_Main.esp'
+      - 'Hideout_Compact.esp'
+      - 'Hideout_HF_Compact.esp'
+  - name: 'DravenManor.esp'
+    after:
+      - 'Landscape Fixes For Grass mods - Cutting Room Floor Locations.esp'
+  - name: 'Eli_Breezehome.esp'
+    group: 'Elianora''''s Breezehome Overhaul'
+  - name: 'Eli_Breezehome \[PATCH - ( {0}|ASLAL {0}|Breezehome BETA Cell Settings {0}|CWE {0}|CWE \+ SREX AIO {0}|ELE {0}|Eli_Halla {0}|HTCO-C {0}|HTCO-Wr {0}|Lux {0}|OCW {0}|RS {0}|RS \+ ELE {0}|SFLPregnancyChildRearing {0}|Spaghetti''s Cities AIO {0}|Spaghetti''s Cities AIO \+ NavCuts {0}|Spaghetti''s Cities AIO \+ SREX AIO {0}|Spaghetti''s Cities WR {0}|Spaghetti''s Cities WR \+ NavCuts {0}|Spaghetti''s Cities WR \+ OCS {0}|Spaghetti''s Cities WR \+ SREX AIO {0}|SREX AIO {0}|SREX WR {0}|TWOTN {0}|TWOTN-L {0}|USSEP {0}|USSEP \+ OCS {0}|USSEP \+ SREX AIO {0}|USSEP \+ SREX WR {0}|VRIK Wash Basin Fix {0}|WS Ultimate {0}|)\]\.esp'
+    after:
+      - 'Eli_Breezehome [ADDON - Aquarium Addon (FishingCC)].esp'
+      - 'Eli_Breezehome [ADDON - Auto Systems].esp'
+      - 'Eli_Breezehome [ADDON - Basement Mannequin 2Plus].esp'
+      - 'Eli_Breezehome [ADDON - CC Armoury Expansion].esp'
+      - 'Eli_Breezehome [ADDON - ELFX-FX].esp'
+      - 'Eli_Breezehome [ADDON - FenixDisenchanter].esp'
+      - 'Eli_Breezehome [ADDON - Molag''s Will].esp'
+      - 'Eli_Breezehome [ADDON - Sorcerer Staff Scroll Overhaul].esp'
+      - 'Eli_Breezehome [ADDON - Tower Top Soil Sprinkler].esp'
+      - 'Eli_Breezehome [ADDON - Use Those Blankets].esp'
+  - name: 'Eli_Breezehome \[PATCH - (Breezehome BETA Cell Settings|ELE|Lux|RS|RS \+ ELE|WS Ultimate)\]\.esp'
+    group: 'Elianora''''s Breezehome Overhaul'
+  - name: 'HearthfireMultiKid_Expanded.esp'
+    after:
+      - 'ChildrenToysAnimObject.esp'
+      - 'IDE Hearthfire.esp'
+  - name: 'Honeyside.esp'
+    after:
+      - 'ELFX - NoHoneyside.esp'
+  - name: 'LC_BuildYourNobleHouse.esp'
+    after:
+      - 'BattleAftermath.esp'
+  - name: 'LC_FeudalKeep.esp'
+    after:
+      - 'Settlements Expanded SE.esp'
+  - name: 'Oppaikuns Gardens -.*\.esp'
+    after:
+      - 'Enhanced Landscapes.esp'
+      - 'HearthFires Roads.esp'
+      - 'Landscape Fixes For Grass Mods.esp'
+      - 'SmoothShores.esp'
+      - 'tpos_complete02_RTCWG.esp'
+  - name: 'Riftrun_HF_v_2_0.esp'
+    after:
+      - 'Hideout_Main.esp'
+      - 'Hideout_HF_Main.esp'
+      - 'Hideout_DLC_Main.esp'
+      - 'Hideout_Compact.esp'
+      - 'Hideout_HF_Compact.esp'
+  - name: 'shadowmarks.esp'
+    group: 'Early Loaders'
+  - name: 'Thur Vonun Sanctum [CORE - Prime Overrides].esp'
+    after:
+      - 'Aspens Ablaze.esp'
+  - name: 'Thur Vonun Sanctum [PATCH - Laboratorium].esp'
+    after:
+      - 'Thur Vonun Sanctum [CORE - Prime Overrides].esp'
+  - name: 'UnlimitedBookshelves.esp'
+    group: 'Fixes'
+  - name: 'LegacyoftheDragonborn.esm'
+    after:
+      - 'unofficial skyrim special edition patch.esp'
+  - name: 'DBM_CloaksofSkyrim_Patch.esp'
+    after:
+      - 'Cloaks_CCOR_Patch.esp'
+      - 'Qw_CloaksOfSkyrim_CRF Patch.esp'
+      - 'Qw_CloaksOfSkyrim_USSEP Patch.esp'
+  - name: 'DBM_CRF_Patch.esp'
+    after:
+      - 'Qw_ACE_CRF Patch.esp'
+      - 'Qw_WACCF_CRF Patch.esp'
+  - name: 'DBM_TreasureHunter_Patch.esp'
+    after:
+      - 'Treasure Hunter - Tweaks and Fixes.esp'
+  - name: 'DBM_WACCF_Patch.esp'
+    after:
+      - 'DBM_CRF_Patch.esp'
+      - 'Qw_ACE_CRF Patch.esp'
+      - 'Qw_WACCF_CRF Patch.esp'
+  - name: 'RelicHunter_Grass_Patch.esp'
+    after:
+      - 'Landscape Fixes For Grass Mods.esp'
+  - name: 'DBM_Redcap_Patch.esp'
+    after:
+      - 'DBM_Xelzaz_Patch.esp'
+  - name: 'AOS_ISC_Integration.esp'
+    group: 'Early Loaders'
+  - name: 'Bards College Expansion - Inigo Patch.esp'
+    after:
+      - 'Inigo Official Patch SE.esp'
+      - 'Inigo Official Patch SE (ESPFE).esp'
+  - name: 'CFTO_fix.esp'
+    after:
+      - 'CFTO.esp'
+  - name: 'ClockworkSuperiorSorting.esp'
+    after:
+      - 'ClockworkBugFixes.esp'
+  - name: 'Favor Quests Separated - Headhunter( Missives)? Patch\.esp'
+    after:
+      - 'BountiesRedone_MissivesExtension.esp'
+  - name: 'imp_helm_IDPM.esp'
+    after:
+      - 'imp_helm_USSEP.esp'
+  - name: 'JKs Winking Skeever - 3DNPC - SFCO Patch.esp'
+    after:
+      - 'SFCO - 3DNPC Patch.esp'
+  - name: 'AwesomePotions_CACO_Patch.esp'
+    after:
+      - 'Hunterborn_CACO-SE_Patch.esp'
+  - name: 'TCIY_Wintersun_Patch.esp'
+    after:
+      - 'BCS_TCIY_Patch.esp'
+      - 'TCIY BCS Patch.esp'
+  - name: 'maplightfix.esp'
+    after:
+      - 'icepenguinworldmapclassic.esp'
+      - 'IcePenguinWorldMapPaper.esp'
+  - name: 'Obsidian Weathers for Vigilant.esp'
+    after:
+      - 'Audio Overhaul Skyrim.esp'
+  - name: 'Requiem - Aetherium Armor.esp'
+    after:
+      - 'Requiem - Improved Closefaced Helmets.esp'
+  - name: 'Requiem - ArteFakes.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - 'Requiem - Cutting Room Floor.esp'
+      - 'Requiem - ESF Companions.esp'
+  - name: 'Requiem - Audio Overhaul Skyrim.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - name: 'Requiem - Cutting Room Floor.esp'
+        condition: 'version("Requiem - Audio Overhaul Skyrim.esp", <, "5.06")'
+  - name: 'Requiem - Book Covers Skyrim.esp'
+    after:
+      - 'Requiem - Minor Arcana - Roleplaying.esp'
+  - name: 'Requiem - Craftable Horse Barding.esp'
+    after:
+      - 'Requiem - Immersive Horses.esp'
+      - 'Requiem - Minor Arcana - Roleplaying.esp'
+  - name: 'Requiem - Cutting Room Floor.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Deadly Dragons.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - ESF Companions.esp'
+    after:
+      - name: 'Requiem - Minor Arcana - Roleplaying.esp'
+        condition: 'version("Requiem - ESF Companions.esp", <, "5.02")'
+  - name: 'Requiem - Flora Fixes.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Heavy Armory.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Immersive Horses.esp'
+    after:
+      - 'Requiem - Minor Arcana - Roleplaying.esp'
+      - 'Requiem - SkyTEST.esp'
+      - 'Requiem - Wild World.esp'
+  - name: 'Requiem - Immersive Sounds Compendium.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Improved Closefaced Helmets.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - 'Requiem - Creation Club.esp'
+  - name: 'Requiem - Rough Leather Armor.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Royal Armory.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - 'Requiem - Minor Arcana - Vigilants of Stendarr.esp'
+      - name: 'Requiem - Warmonger Armory.esp'
+        condition: 'version("Requiem - Royal Armory.esp", <, "5.02")'
+  - name: 'Requiem - Scoped Bows.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - SkyTEST.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Timing Is Everything.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Trade and Barter.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Requiem - Vampiric Thirst.esp'
+    after:
+      - 'Vampiric Thirst Redone.esp'
+  - name: 'Requiem - Warmonger Armory.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+      - 'Requiem - Minor Arcana - Vigilants of Stendarr.esp'
+      - 'Requiem - Scale Nord Armor.esp'
+  - name: 'Requiem - Wild World.esp'
+    after:
+      - 'Fozars_Dragonborn_-_Requiem_Patch.esp'
+  - name: 'Spell Research - Patch Compendium.esp'
+    after:
+      - 'SpellResearch.esp'
+  - name: 'Summermyst - WACCF Patch.esp'
+    after:
+      - 'WACCF_BashedPatchLvlListFix.esp'
+  - name: 'The Great City of Dragon Bridge - JK''s Skyrim Patch.esp'
+    after:
+      - 'The Great City of Dragon Bridge - USSEP Patch.esp'
+  - name: 'Falskaar - Bug Fixes.esp'
+    after:
+      - 'Falskaar - Boat Location.esp'
+      - 'Falskaar - Fast Travel.esp'
+      - 'Falskaar - House Map Marker.esp'
+  - name: 'JKs Skyrim_(No Snow Under the Roof|Dawnstar_NSUTR|Dawnstar_BOYD_NSUTR)_Patch\.esp'
+    after:
+      - 'NSUTR_groundsnow_mesh_fixes.esp'
+  - name: 'Chr_KhajiitSpeak.*\.esp'
+    after:
+      - 'BA_KhajiitSpeakRedux_MAIN.esp'
+      - 'mjhKhajiitSpeak.esp'
+  - name: 'Khajiit Speak Extended SSE.*\.esp'
+    after:
+      - 'BA_KhajiitSpeakRedux_MAIN.esp'
+      - 'mjhKhajiitSpeak.esp'
+  - name: 'Khajiit Speak \+.*\.esp'
+    after:
+      - 'BA_KhajiitSpeakRedux_MAIN.esp'
+      - 'mjhKhajiitSpeak.esp'
+  - name: 'Khajiit Speak - .*\.esp'
+    after:
+      - 'BA_KhajiitSpeakRedux_MAIN.esp'
+      - 'mjhKhajiitSpeak.esp'
+  - name: 'MPXP1.2 [PATCH - SSkwy.TGCoS] (OCS).esp'
+    after:
+      - 'ocs + lotd5 patch.esp'
+  - name: 'MPXP1.3 [PATCH - SSkwy.LotD].esp'
+    after:
+      - 'MPXP1.1 [PATCH - SSkwy.TGCoS].esp'
+  - name: 'MPXP1.3 [PATCH - DBPT.SSkwy.LotD].esp'
+    after:
+      - 'MPXP1.1 [PATCH - DBPT.SSkwy.TGCoS].esp'
+  - name: 'MPXP1.3 [PATCH - SSkwy.LotD] (OCS).esp'
+    after:
+      - 'MPXP1.2 [PATCH - SSkwy.TGCoS] (OCS).esp'
+  - name: 'MPXP1.3 [PATCH - DBPT.SSkwy.LotD] (OCS).esp'
+    after:
+      - 'MPXP1.2 [PATCH - DBPT.SSkwy.TGCoS] (OCS).esp'
+  - name: 'MPXP1.4 [PATCH - SSkwy.TGCoS.JKBP.PCE].esp'
+    after:
+      - 'MPXP1.3 [PATCH - SSkwy.LotD].esp'
+  - name: 'MPXP1.4 [PATCH - SSkwy.TGCoS.JKBP.PCE] (OCS).esp'
+    after:
+      - 'MPXP1.3 [PATCH - SSkwy.LotD] (OCS).esp'
+  - name: 'MPXP1\.4 \[PATCH - DBPT\.SSkwy(\.LotD)?\.JKBP\]\.esp'
+    after:
+      - 'MPXP1.1 [PATCH - DBPT.SSkwy].esp'
+      - 'MPXP1.1 [PATCH - DBPT.SSkwy.TGCoS].esp'
+  - name: 'MPXP1\.4 \[PATCH - DBPT\.SSkwy(\.LotD)?\.JKBP\] \(OCS\)\.esp'
+    after:
+      - 'MPXP1.2 [PATCH - DBPT.SSkwy] (OCS).esp'
+      - 'MPXP1.2 [PATCH - DBPT.SSkwy.TGCoS] (OCS).esp'
+  - name: 'MPXP1\.4 \[PATCH - DBPT\.SSkwy(\.LotD)?\.PCE\]\.esp'
+    after:
+      - 'MPXP1.1 [PATCH - DBPT.SSkwy].esp'
+      - 'MPXP1.1 [PATCH - DBPT.SSkwy.TGCoS].esp'
+  - name: 'MPXP1\.4 \[PATCH - DBPT\.SSkwy(\.LotD)?\.PCE\] \(OCS\)\.esp'
+    after:
+      - 'MPXP1.2 [PATCH - DBPT.SSkwy] (OCS).esp'
+      - 'MPXP1.2 [PATCH - DBPT.SSkwy.TGCoS] (OCS).esp'
+  - name: 'MPXP1.4 [PATCH - SSkwy.TGCoS.PCE].esp'
+    after:
+      - 'MPXP1.3 [PATCH - SSkwy.LotD].esp'
+  - name: 'MPXP1.4 [PATCH - SSkwy.TGCoS.PCE] (OCS).esp'
+    after:
+      - 'MPXP1.3 [PATCH - SSkwy.LotD] (OCS).esp'
+  - name: 'MPXP1.4 [PATCH - SSkwy.TGCoS.LotD.RBS].esp'
+    after:
+      - 'MPXP1.3 [PATCH - DBPT.SSkwy.LotD].esp'
+      - 'MPXP1.3 [PATCH - SSkwy.LotD].esp'
+  - name: 'SSkwy Estuary Fortress Extension.esp'
+    after:
+      - 'MPXP1.1 [PATCH - DBPT.SSkwy].esp'
+      - 'MPXP1.1 [PATCH - DBPT.SSkwy.TGCoS].esp'
+      - 'MPXP1.1 [PATCH - SSkwy.TGCoS].esp'
+      - 'MPXP1.2 [PATCH - DBPT.SSkwy] (OCS).esp'
+      - 'MPXP1.2 [PATCH - DBPT.SSkwy.TGCoS] (OCS).esp'
+      - 'MPXP1.2 [PATCH - SSkwy.TGCoS] (OCS).esp'
+      - 'MPXP1.3 [PATCH - DBPT.SSkwy.LotD].esp'
+      - 'MPXP1.3 [PATCH - DBPT.SSkwy.LotD] (OCS).esp'
+      - 'MPXP1.3 [PATCH - SSkwy.LotD].esp'
+      - 'MPXP1.3 [PATCH - SSkwy.LotD] (OCS).esp'
+  - name: 'KvHarborside [PATCH - SSkwy.TGCoS].esp'
+    after:
+      - 'MPXP1.1 [PATCH - DBPT.SSkwy.TGCoS].esp'
+      - 'MPXP1.1 [PATCH - SSkwy.TGCoS].esp'
+      - 'MPXP1.2 [PATCH - DBPT.SSkwy.TGCoS] (OCS).esp'
+      - 'MPXP1.2 [PATCH - SSkwy.TGCoS] (OCS).esp'
+  - name: 'Qw_ACE_BSHeartland Patch.esp'
+    after:
+      - 'Qw_BeyondSkyrimBruma_USSEP Hotfix Patch.esp'
+  - name: 'Qw_Diversity_ICoWinterhold Patch.esp'
+    after:
+      - 'Qw_Diversity_CRF Patch.esp'
+  - name: 'Qw_PANNPCs_ICoWinterhold Patch.esp'
+    after:
+      - 'Qw_PANNPCs_CRF Patch.esp'
+  - name: 'Qw_TheOrdinaryWomen_ICoWinterhold Patch.esp'
+    after:
+      - 'Qw_TheOrdinaryWomen_CRF Patch.esp'
+  - name: 'Qw_WACCF_BSHeartland Patch.esp'
+    after:
+      - 'Qw_BeyondSkyrimBruma_USSEP Hotfix Patch.esp'
+  - name: 'Qw_WACCF_ISC Patch.esp'
+    after:
+      - 'Qw_ISC_USSEP Patch.esp'
+  - name: 'step patch - conflict resolution.esp'
+    group: 'Conflict Resolution Patches (Late)'
+  - name: 'UltimateCollege.esp'
+    after:
+      - 'ImmersiveIntegrationSE15.esp'
+      - 'mihailbeholder.esp'
+      - 'mihailspectres.esp'
+      - 'UCOW Smash Fix.esp'
+  - name: 'Wintersun - SIC Patch.esp'
+    after:
+      - 'SIC BetterQuestObjectives.esp'
+  - name: 'Blowing in the Wind - ELFX Exterior patch.esp'
+    group: 'Early Loaders'
+    after:
+      - 'Blowing in the Wind - Lanterns of Skyrim Patch SSE.esp'
+      - 'Blowing in the Wind - Lanterns of Skyrim SE - MCM versionPatch.esp'
+      - 'Blowing in the Wind - SMIM Merged All Patch SSE.esp'
+  - name: 'Blowing in the Wind - Lanterns of Skyrim SE - MCM versionPatch.esp'
+    group: 'Early Loaders'
+  - name: 'UnforgivingDevices - DD Patch.esp'
+    after:
+      - 'Devious Devices - Lore Patch.esp'
+      - 'Devious Devices SE patch.esp'
+  - name: 'UnforgivingDevices - LBS Patch.esp'
+    after:
+      - 'UnforgivingDevices - DD Patch.esp'
+  - name: 'UnforgivingDevices - Pink Patch.esp'
+    after:
+      - 'UnforgivingDevices - DD Patch.esp'
+  - name: 'UnforgivingDevices - Security Overhaul Patch.esp'
+    after:
+      - 'UnforgivingDevices - DD Patch.esp'
+  - name: 'UnforgivingDevices - DCL Patch.esp'
+    after:
+      - 'UnforgivingDevices - DD Patch.esp'
+  - name: 'UnforgivingDevices - CACO Patch.esp'
+    after:
+      - 'UnforgivingDevices - DD Patch.esp'
+  - name: 'mpThievesNightOnTheTown.esp'
+    after:
+      - 'Thieves Guild Requirements.esp'
