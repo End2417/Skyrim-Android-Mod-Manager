@@ -1,18 +1,13 @@
 name: Build Skyrim Mod Manager APK
 
-# The app's source lives in SkyrimModManager-v<APP_VERSION>-source.zip in the repository root. Upload the zip for the new version and this workflow unpacks it (and deletes the zip after a good build) into the
+# The app's source lives in a .zip in the repository root (any name). Upload the zip and this workflow unpacks it (and deletes the zip after a good build) into the
 # repository root, commits the files so they can be browsed on GitHub, builds the APK and attaches it to the run as an artifact.
-# Run it from the Actions tab (Run workflow) or just push the new zip.
+# It only runs when you start it: Actions tab > this workflow > Run workflow. Pushing to the repository does not start it.
 on:
-  push:
-    branches: ['**']
   workflow_dispatch:
 
 permissions:
   contents: write
-
-env:
-  APP_VERSION: '1.4.0'   # shown in the app and in the APK file name; change it for each release
 
 concurrency:
   group: build
@@ -33,9 +28,31 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
+      - name: Find the source zip
+        run: |
+          set -e
+          # Any .zip in the repository root; the name does not matter. If there are several, the one added last is used.
+          mapfile -t ZIPS < <(for z in ./*.[zZ][iI][pP]; do [ -f "$z" ] && printf '%s %s\n' "$(git log -1 --format=%ct -- "$z")" "${z#./}"; done | sort -n | cut -d' ' -f2-)
+          if [ "${#ZIPS[@]}" -eq 0 ]; then
+            echo "::error::No source zip found in the repository root. Upload it there and run again."
+            exit 1
+          fi
+          SOURCE_ZIP="${ZIPS[-1]}"
+          if [ "${#ZIPS[@]}" -gt 1 ]; then echo "::warning::Several zips found (${ZIPS[*]}); using $SOURCE_ZIP."; fi
+          BASE="${SOURCE_ZIP%.[zZ][iI][pP]}"
+          APP_NAME="${BASE%-source}"
+          APP_VERSION=$(printf '%s' "$BASE" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || true)
+          if [ -z "$APP_VERSION" ]; then
+            APP_VERSION="0.0.0"
+            echo "::warning::No version number (like 1.4.0) in $SOURCE_ZIP; using 0.0.0."
+          fi
+          echo "SOURCE_ZIP=$SOURCE_ZIP" >> "$GITHUB_ENV"
+          echo "APP_NAME=$APP_NAME" >> "$GITHUB_ENV"
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "Building $SOURCE_ZIP as version $APP_VERSION"
+
       - name: Unpack the source zip into the repository root
         env:
-          SOURCE_ZIP: SkyrimModManager-v${{ env.APP_VERSION }}-source.zip
           TARGET: .
         run: |
           set -e
@@ -108,18 +125,16 @@ jobs:
           "$BT/aapt2" dump badging "$APK" | head -1
 
       - name: Name the APK
-        run: cp app/build/outputs/apk/release/app-release.apk SkyrimModManager-v${{ env.APP_VERSION }}.apk
+        run: cp app/build/outputs/apk/release/app-release.apk ${{ env.APP_NAME }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: SkyrimMM-apk
-          path: SkyrimModManager-v${{ env.APP_VERSION }}.apk
+          path: ${{ env.APP_NAME }}.apk
 
       # Only after a successful build: remove the source zip from the repository root. The unpacked source stays; to update the app, upload a new zip.
       - name: Remove the source zip from the repository
         if: success()
-        env:
-          SOURCE_ZIP: SkyrimModManager-v${{ env.APP_VERSION }}-source.zip
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
