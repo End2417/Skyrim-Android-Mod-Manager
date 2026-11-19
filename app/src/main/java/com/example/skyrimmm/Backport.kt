@@ -20,7 +20,7 @@ import androidx.documentfile.provider.DocumentFile
 import java.io.File
 
 /** The outcome of a Special Edition to Legendary Edition conversion: the converted zip and the checks that were run on it. */
-class ConvResult(val file: Uri, val report: String, val passed: Int, val warns: Int, val fails: Int, val missing: List<String>)
+class ConvResult(val file: Uri, val report: String, val passed: Int, val warns: Int, val fails: Int, val missing: List<String>, val src: Uri? = null)
 
 /** Runs the bundled SE2LE converter (package com.se2le) on an archive and hands the result to the normal install. */
 object Backport {
@@ -52,7 +52,7 @@ object Backport {
         } finally { input.delete() }
         val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", out)
         return ConvResult(uri, rep.text(),
-            rep.checks.count { it.first == "PASS" }, rep.checks.count { it.first == "WARN" }, rep.checks.count { it.first == "FAIL" }, rep.missing.toList())
+            rep.checks.count { it.first == "PASS" }, rep.checks.count { it.first == "WARN" }, rep.checks.count { it.first == "FAIL" }, rep.missing.toList(), src)
     }
 }
 
@@ -78,6 +78,8 @@ fun ConvertOptionsDialog(initial: Int, onStart: (Int) -> Unit, onClose: () -> Un
                 }
                 Text("Smaller textures use less memory and storage in the game. Textures already below the limit are left alone.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Text("Converting is for your own use. Respect the mod author's permissions, and don't share converted files without them.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = 4.dp))
             }
         },
         confirmButton = { TextButton(onClick = { onStart(cap) }) { Text("Convert") } },

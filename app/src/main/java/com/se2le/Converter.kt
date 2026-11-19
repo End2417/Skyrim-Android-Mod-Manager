@@ -30,6 +30,7 @@ class Report {
     var onProgress: ((String) -> Unit)? = null
     var embedReport = true   // false when the host app shows or keeps the report itself
     val hkx = mutableListOf<String>()
+    var hkxConverted = 0
     val checks = mutableListOf<Pair<String, String>>()
     fun check(status: String, msg: String) { checks.add(status to msg) }
 
@@ -51,9 +52,9 @@ class Report {
         section("Plugins converted", plugins)
         section("${nif.size} meshes could not be converted (still SE format): use Cathedral Assets Optimizer", nif, 200)
         section("${dds.size} textures could not be converted (LE can't read them): use Cathedral Assets Optimizer", dds, 200)
-        section("${hkx.size} SE (64-bit) animations: convert with a Havok converter on a PC", hkx, 200)
+        section("${hkx.size} animation file(s) could not be converted (still 64-bit, they will not work in LE): convert them with a Havok tool on a PC", hkx, 200)
         section("Notes", notes)
-        appendLine("\nNot handled: SKSE plugins, SPID/KID/SkyPatcher, plugin merging, removing/re-indexing missing masters, SE-only fields in records other than STAT and WEAP CRDT, skinned or complex NIF meshes, BC6H / signed BC4-BC5 / uncompressed DX10 textures, HKX animations, BSA repacking.")
+        appendLine("\nNot handled: SKSE plugins, SPID/KID/SkyPatcher, plugin merging, removing/re-indexing missing masters, SE-only fields in records other than STAT and WEAP CRDT, skinned or complex NIF meshes, BC6H / signed BC4-BC5 / uncompressed DX10 textures, behavior and skeleton HKX files, animations with extracted motion, BSA repacking.")
     }
 }
 
@@ -417,6 +418,26 @@ object Converter {
         }
     }
 
+    /**
+     * Converts a plain SE animation clip (Havok packfile with 64-bit pointers) to the LE layout. A file that is already 32-bit, and
+     * anything that is not a clip this converter understands (behaviors, skeletons, other Havok versions), is kept as it is; the
+     * ones that stay 64-bit are listed in the report.
+     */
+    private fun convertAnim(name: String, bytes: ByteArray, rep: Report): ByteArray {
+        if (HkxConverter.pointerSize(bytes) != 8) return bytes
+        rep.onProgress?.invoke(name)
+        return try {
+            val out = HkxConverter.toLegendary(bytes)
+            val bad = HkxConverter.verify(out)
+            if (bad != null) throw IOException("converted animation failed the re-check ($bad)")
+            rep.hkxConverted++
+            out
+        } catch (t: Throwable) {
+            rep.hkx.add("$name (${t.message ?: t.javaClass.simpleName})")
+            bytes
+        }
+    }
+
     private fun dxgiName(id: Int) = when (id) {
         in 70..72 -> "BC1"; in 73..75 -> "BC2"; in 76..78 -> "BC3"; in 79..81 -> "BC4"; in 82..84 -> "BC5"
         in 94..96 -> "BC6H"; in 97..99 -> "BC7"; in 27..32 -> "R8G8B8A8"; in 87..93 -> "B8G8R8A8/X8"; 61 -> "R8"
@@ -436,7 +457,6 @@ object Converter {
 
     private fun classify(name: String, lower: String, ext: String, head: ByteArray, rep: Report) {
         if (ext == "dll" && "skse/plugins/" in lower) rep.skse++
-        if (ext == "hkx" && head.size >= 20 && r32(head, 0) == 0x57E0E057 && r32(head, 4) == 0x10C0C010 && (head[16].toInt() and 255) == 8) rep.hkx.add(name)
         if (ext == "dll" && "skse/plugins/" in lower)
             rep.warnings.add("$name is an SKSE plugin DLL: SE DLLs cannot run in LE. Features that depend on it will not work.")
         if (lower.endsWith("_distr.ini") || lower.endsWith("_kid.ini") || lower.endsWith("_swap.ini") || "skypatcher" in lower)
@@ -591,7 +611,12 @@ object Converter {
         }
         if (rep.texConverted > 0) rep.check("PASS", "${rep.texConverted} texture(s) converted to LE-readable DDS and re-checked")
         rep.check(if (rep.dds.isEmpty()) "PASS" else "WARN", if (rep.dds.isEmpty()) "every DDS texture is LE-readable" else "${rep.dds.size} texture(s) could not be converted and won't load in LE")
-        rep.check(if (rep.hkx.isEmpty()) "PASS" else "WARN", if (rep.hkx.isEmpty()) "no 64-bit animations found" else "${rep.hkx.size} SE animation(s) still need converting")
+        if (rep.hkxConverted > 0) {
+            rep.check("PASS", "${rep.hkxConverted} animation(s) converted from 64-bit to 32-bit Havok and structurally re-checked")
+            rep.changes.add("${rep.hkxConverted} animation file(s) converted from 64-bit to 32-bit Havok (the LE layout)")
+            rep.notes.add("Converted animations matched real LE files byte for byte in a test with a combat animation pack, but they were not played in the game here. Test one in game before trusting the rest.")
+        }
+        rep.check(if (rep.hkx.isEmpty()) "PASS" else "WARN", if (rep.hkx.isEmpty()) "every animation is LE format" else "${rep.hkx.size} animation file(s) could not be converted and will not work in LE")
         rep.check(if (rep.skse == 0) "PASS" else "WARN", if (rep.skse == 0) "no SKSE plugin DLLs found" else "${rep.skse} SKSE plugin DLL(s) cannot run in LE")
         rep.check(if (rep.scriptIssues == 0) "PASS" else "WARN", "${rep.pex} compiled script(s) scanned, ${rep.scriptIssues} script(s) with issues")
     }
@@ -683,7 +708,7 @@ object Converter {
                 if (!seen.add(n.lowercase())) return false
                 val e2 = n.substringAfterLast('.', "").lowercase()
                 if (e2 == "pex" || e2 == "psc") scanScript(n, data, plugs, rep)
-                val out = if (e2 == "dds") convertTexture(n, data, rep) else if (e2 == "nif") convertMesh(n, data, rep) else data
+                val out = if (e2 == "dds") convertTexture(n, data, rep) else if (e2 == "nif") convertMesh(n, data, rep) else if (e2 == "hkx") convertAnim(n, data, rep) else data
                 zout.putNextEntry(ZipEntry(n)); zout.write(out); zout.closeEntry()
                 return out === data
             }
@@ -713,7 +738,7 @@ object Converter {
                     }
                     return@forEachEntry
                 }
-                if (ext == "pex" || ext == "psc" || ext == "dds" || ext == "nif") { if (emit(name, s.readBytes())) rep.kept++; return@forEachEntry }
+                if (ext == "pex" || ext == "psc" || ext == "dds" || ext == "nif" || ext == "hkx") { if (emit(name, s.readBytes())) rep.kept++; return@forEachEntry }
                 val outName = renameAsset(name, plugs, rep)
                 if (!seen.add(outName.lowercase())) { rep.notes.add("Skipped duplicate entry $name"); return@forEachEntry }
                 val head = ByteArrayOutputStream()
